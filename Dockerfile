@@ -2,7 +2,7 @@
 # Choose the role at runtime: ROLE=web | worker | egress.
 # The dashboard ships separately (Next.js standalone output).
 
-FROM node:22-slim AS base
+FROM node:26-slim AS base
 # Install pnpm with npm rather than corepack: corepack is no longer bundled from Node 25 on.
 # Keep in sync with "packageManager" in package.json.
 ARG PNPM_VERSION=10.34.9
