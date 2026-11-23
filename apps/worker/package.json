@@ -1,0 +1,28 @@
+{
+  "name": "@aiw/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "worker process: Temporal workflows and activities, brokers, outbox dispatcher, background jobs",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/worker.ts",
+    "build": "tsup && tsx scripts/bundle-workflows.ts",
+    "start": "node dist/worker.js",
+    "ping": "tsx scripts/ping.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aiw/config": "workspace:*",
+    "@aiw/logger": "workspace:*",
+    "@temporalio/activity": "^1.26.0",
+    "@temporalio/client": "^1.26.0",
+    "@temporalio/common": "^1.26.0",
+    "@temporalio/worker": "^1.26.0",
+    "@temporalio/workflow": "^1.26.0"
+  },
+  "devDependencies": {
+    "@temporalio/testing": "^1.26.0",
+    "tsup": "^9.0.0"
+  }
+}

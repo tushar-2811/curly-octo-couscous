@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+onlyBuiltDependencies:
+  - '@swc/core'
+  - '@temporalio/core-bridge'
+  - esbuild
+  - sharp
+  - unrs-resolver

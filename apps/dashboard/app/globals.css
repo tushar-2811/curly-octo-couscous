@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+/*
+ * Monochrome design system. The only colors in the product are black, white and three
+ * greys. States (error, success, warning) are shown with icons, weight and borders,
+ * never with color. Tailwind's default palette is removed so no other color can slip in.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-gray-100: #f2f2f2; /* subtle fills: hover rows, skeletons */
+  --color-gray-300: #d4d4d4; /* borders and dividers */
+  --color-gray-600: #5c5c5c; /* secondary text, disabled */
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-white text-black antialiased;
+  }
+  ::selection {
+    @apply bg-black text-white;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-black;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@utility animate-shimmer {
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer,
+  .animate-spin {
+    animation: none;
+  }
+}

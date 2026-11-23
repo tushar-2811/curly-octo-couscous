@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: ai_workforce_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://postgres@localhost:5432/ai_workforce_test
+      DATABASE_URL: postgres://postgres@localhost:5432/ai_workforce_test
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint (includes module-boundary rules)
+        run: pnpm lint
+      - name: Formatting
+        run: pnpm format:check
+      - name: Type-check
+        run: pnpm typecheck
+      - name: Migrations apply cleanly
+        run: pnpm db:migrate && pnpm db:migrate:down && pnpm db:migrate
+      - name: Tests (migration test runs against the Postgres service)
+        run: pnpm test
+      - name: Build all apps
+        run: pnpm build
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+      - name: Scan full history
+        run: gitleaks git --redact --no-banner .
+
+  image:
+    name: Build backend image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (web, worker, egress share one image)
+        run: docker build -t ai-workforce-backend:ci .

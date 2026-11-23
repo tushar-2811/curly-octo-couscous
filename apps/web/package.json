@@ -1,0 +1,25 @@
+{
+  "name": "@aiw/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "web process: REST API for the dashboard, provider webhooks, server-sent events",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aiw/config": "workspace:*",
+    "@aiw/db": "workspace:*",
+    "@aiw/logger": "workspace:*",
+    "@fastify/rate-limit": "^11.3.0",
+    "fastify": "^5.12.8",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0"
+  }
+}

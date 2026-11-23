@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.next/
+out/
+*.tsbuildinfo
+apps/worker/workflow-bundle.js
+
+# env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# local data
+.data/
+*.log
+coverage/
+
+# editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

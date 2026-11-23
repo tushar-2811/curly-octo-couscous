@@ -1,0 +1,50 @@
+{
+  "name": "ai-workforce",
+  "private": true,
+  "description": "AI Workforce Platform: hire AI employees that work in Google Chat, Jira and Git.",
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:apps": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r build",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @aiw/db migrate up",
+    "db:migrate:down": "pnpm --filter @aiw/db migrate down",
+    "db:migrate:status": "pnpm --filter @aiw/db migrate status",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@next/eslint-plugin-next": "^15.5.29",
+    "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@aiw/egress",
+  "version": "0.0.0",
+  "private": true,
+  "description": "egress process: credential-injecting proxy for sandboxes (placeholder until Phase 3)",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aiw/config": "workspace:*",
+    "@aiw/logger": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@aiw/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "migrate": "tsx src/migrate.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aiw/config": "workspace:*",
+    "@aiw/logger": "workspace:*",
+    "kysely": "^0.29.9",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}
