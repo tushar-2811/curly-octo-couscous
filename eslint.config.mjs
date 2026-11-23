@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      '**/.next-dev/**',
       '**/coverage/**',
       'apps/worker/workflow-bundle.js',
       'apps/dashboard/next-env.d.ts',
