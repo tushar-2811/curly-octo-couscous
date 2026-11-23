@@ -5,15 +5,20 @@ import { RetryButton } from '@/components/retry-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/states';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getMe } from '@/lib/api';
 import { ApiError } from '@/lib/api-error';
 
 export const dynamic = 'force-dynamic';
 
-export default function OverviewPage() {
+export default async function OverviewPage() {
+  const me = await getMe();
+  const firstName = me.member?.display_name.split(' ')[0] ?? '';
   return (
     <>
-      <PageHeader title="Overview" description="Your AI workforce at a glance." />
+      <PageHeader
+        title={firstName ? `Welcome, ${firstName}` : 'Overview'}
+        description={`${me.organization?.name ?? 'Your organization'} · your AI workforce at a glance.`}
+      />
       <div className="grid gap-6">
         <Suspense fallback={<SystemStatusSkeleton />}>
           <SystemStatus />

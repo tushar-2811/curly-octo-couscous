@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { WorkforceError } from '@aiw/workforce';
 import { ZodError } from 'zod';
 
 /**
@@ -17,6 +18,14 @@ export class AppError extends Error {
     this.name = 'AppError';
   }
 }
+
+const WORKFORCE_STATUS: Record<WorkforceError['code'], number> = {
+  already_member: 409,
+  domain_taken: 409,
+  domain_not_allowed: 422,
+  not_found: 404,
+  forbidden: 403,
+};
 
 export interface Problem {
   type: string;
@@ -75,6 +84,15 @@ export function errorHandler(
         errors,
       }),
     );
+  }
+
+  if (error instanceof WorkforceError) {
+    const status = WORKFORCE_STATUS[error.code];
+    const extras = error.field
+      ? { errors: [{ path: error.field, message: error.message }] }
+      : undefined;
+    request.log.warn({ code: error.code, field: error.field }, error.message);
+    return send(reply, problem(request, status, error.code, error.message, undefined, extras));
   }
 
   if (error instanceof AppError) {

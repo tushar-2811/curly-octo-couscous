@@ -2,6 +2,7 @@ import { createDb, pingDb } from '@aiw/db';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
 import { buildApp } from './app';
 import { loadWebConfig } from './config';
+import { SessionCodec } from './session';
 
 const config = loadWebConfig();
 const logger = createLogger({
@@ -37,7 +38,15 @@ const app = await buildApp({
   meta: { service: 'web', version: config.SERVICE_VERSION, env: config.APP_ENV },
   readinessChecks: { database: () => pingDb(db) },
   clientLogRateLimit: config.CLIENT_LOG_RATE_LIMIT,
+  auth: {
+    db,
+    codec: new SessionCodec(config.SESSION_SECRET, config.SESSION_TTL_HOURS),
+    // Local dev runs over http; everywhere else cookies are HTTPS-only.
+    secureCookies: config.APP_ENV !== 'local',
+    devLogin: config.AUTH_DEV_LOGIN,
+  },
 });
+if (config.AUTH_DEV_LOGIN) logger.warn('development sign-in is enabled (local only)');
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {

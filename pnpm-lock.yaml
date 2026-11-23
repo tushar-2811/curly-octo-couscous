@@ -112,12 +112,24 @@ importers:
       '@aiw/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@aiw/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@aiw/workforce':
+        specifier: workspace:*
+        version: link:../../packages/workforce
+      '@fastify/cookie':
+        specifier: ^11.1.5
+        version: 11.1.5
       '@fastify/rate-limit':
         specifier: ^11.3.0
         version: 11.3.0
       fastify:
         specifier: ^5.12.8
         version: 5.12.8
+      jose:
+        specifier: ^6.2.18
+        version: 6.2.18
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -211,6 +223,24 @@ importers:
       pino-pretty:
         specifier: ^13.2.0
         version: 13.2.0
+
+  packages/platform:
+    dependencies:
+      '@aiw/db':
+        specifier: workspace:*
+        version: link:../db
+
+  packages/workforce:
+    dependencies:
+      '@aiw/db':
+        specifier: workspace:*
+        version: link:../db
+      '@aiw/logger':
+        specifier: workspace:*
+        version: link:../logger
+      '@aiw/platform':
+        specifier: workspace:*
+        version: link:../platform
 
 packages:
 
@@ -417,6 +447,9 @@ packages:
 
   '@fastify/ajv-compiler@4.0.8':
     resolution: {integrity: sha512-xYcAFYoyP/NELMgj6I7LmMAmiqeXMal0wsM2SgueN9OyMr6bVKHomO9OxuStC7bIAEl4Z3JXBbDPwpXRp59NPQ==}
+
+  '@fastify/cookie@11.1.5':
+    resolution: {integrity: sha512-hs7e0otf7n/lJMpt63EFdQb5/u8kO6DeexEtLPVTybSdItC6SwJ1O0vtTyWvKNR70LZcHLlsUr/y3jFpqtyWRA==}
 
   '@fastify/deepmerge@3.2.4':
     resolution: {integrity: sha512-kc8GQq5gX9RRhw0rov3DMrN8wS8yRlxJRdDzsYwwdBV/wazuVgc/1K7CKL90tlvu3RlHan6Y0R0aE3nJtBz2eQ==}
@@ -2160,6 +2193,9 @@ packages:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
 
+  jose@6.2.18:
+    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
+
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
@@ -3331,6 +3367,11 @@ snapshots:
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       fast-uri: 4.2.3
+
+  '@fastify/cookie@11.1.5':
+    dependencies:
+      cookie: 2.0.2
+      fastify-plugin: 6.0.1
 
   '@fastify/deepmerge@3.2.4': {}
 
@@ -5038,6 +5079,8 @@ snapshots:
       supports-color: 8.1.1
 
   jiti@2.7.0: {}
+
+  jose@6.2.18: {}
 
   joycon@3.1.1: {}
 

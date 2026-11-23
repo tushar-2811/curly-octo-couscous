@@ -11,7 +11,15 @@
  * Ctrl+C stops the apps and the local services this script started.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +37,18 @@ const envPath = path.join(root, '.env');
 if (!existsSync(envPath)) {
   copyFileSync(path.join(root, '.env.example'), envPath);
   say('created .env from .env.example');
+}
+// Generate a local session secret once, so nobody has to invent one.
+if (!/^SESSION_SECRET=.{32,}$/m.test(readFileSync(envPath, 'utf8'))) {
+  const secret = randomBytes(32).toString('base64url');
+  const content = readFileSync(envPath, 'utf8');
+  writeFileSync(
+    envPath,
+    /^SESSION_SECRET=.*$/m.test(content)
+      ? content.replace(/^SESSION_SECRET=.*$/m, `SESSION_SECRET=${secret}`)
+      : `${content.trimEnd()}\nSESSION_SECRET=${secret}\nAUTH_DEV_LOGIN=true\n`,
+  );
+  say('generated SESSION_SECRET in .env');
 }
 for (const line of readFileSync(envPath, 'utf8').split('\n')) {
   const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);

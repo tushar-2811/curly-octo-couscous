@@ -19,7 +19,8 @@ export function serverLog(level: Level, msg: string, fields: Record<string, unkn
     msg,
     ...serializeErrors(fields),
   });
-  if (level === 'error' || level === 'warn') console.error(line);
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
   else console.log(line);
 }
 

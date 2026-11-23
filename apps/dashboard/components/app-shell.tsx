@@ -1,9 +1,19 @@
 'use client';
 
-import { Bot, Building2, LayoutDashboard, ListChecks, Menu, Settings, X } from 'lucide-react';
+import {
+  Bot,
+  Building2,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  Menu,
+  Settings,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { clientFetch } from '@/lib/client-api';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -18,7 +28,15 @@ function isActive(pathname: string, href: string): boolean {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  orgName,
+  user,
+}: {
+  children: ReactNode;
+  orgName: string;
+  user: { name: string; email: string };
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [pathname]);
@@ -54,9 +72,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
 
-      <aside className="hidden w-60 shrink-0 border-r border-gray-300 px-4 py-6 md:block">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-gray-300 px-4 py-6 md:flex">
         <Brand />
-        <div className="mt-8">{nav}</div>
+        <p className="mt-1 truncate pl-8 text-xs text-gray-600" title={orgName}>
+          {orgName}
+        </p>
+        <div className="mt-8 flex-1">{nav}</div>
+        <UserFooter user={user} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -72,7 +94,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
         </header>
-        {open && <div className="border-b border-gray-300 px-4 py-3 md:hidden">{nav}</div>}
+        {open && (
+          <div className="border-b border-gray-300 px-4 py-3 md:hidden">
+            {nav}
+            <div className="mt-4">
+              <UserFooter user={user} />
+            </div>
+          </div>
+        )}
 
         <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 md:px-10 md:py-10">
           {children}
@@ -93,5 +122,37 @@ function Brand() {
       </span>
       Workforce
     </Link>
+  );
+}
+
+function UserFooter({ user }: { user: { name: string; email: string } }) {
+  const [pending, setPending] = useState(false);
+  async function signOut() {
+    setPending(true);
+    try {
+      await clientFetch('/v1/auth/logout', { method: 'POST' });
+    } finally {
+      // Leave even if the request failed: the cookie expires on its own.
+      window.location.assign('/sign-in');
+    }
+  }
+  return (
+    <div className="border-t border-gray-300 pt-4">
+      <p className="truncate text-sm font-medium" title={user.name}>
+        {user.name}
+      </p>
+      <p className="truncate text-xs text-gray-600" title={user.email}>
+        {user.email}
+      </p>
+      <button
+        type="button"
+        onClick={signOut}
+        disabled={pending}
+        className="mt-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100 disabled:opacity-50"
+      >
+        <LogOut className="size-4" aria-hidden strokeWidth={1.75} />
+        {pending ? 'Signing out…' : 'Sign out'}
+      </button>
+    </div>
   );
 }

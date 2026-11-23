@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
-import { AppShell } from '@/components/app-shell';
 import { ClientErrorListener } from '@/components/client-error-listener';
 import './globals.css';
 
@@ -22,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${inter.variable} ${mono.variable}`}>
       <body className="font-sans">
         <ClientErrorListener />
-        <AppShell>{children}</AppShell>
+        {children}
       </body>
     </html>
   );
