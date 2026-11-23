@@ -3,8 +3,10 @@
 # The dashboard ships separately (Next.js standalone output).
 
 FROM node:22-slim AS base
-ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
-RUN corepack enable
+# Install pnpm with npm rather than corepack: corepack is no longer bundled from Node 25 on.
+# Keep in sync with "packageManager" in package.json.
+ARG PNPM_VERSION=10.34.9
+RUN npm install -g pnpm@${PNPM_VERSION} && pnpm --version
 WORKDIR /app
 
 FROM base AS build

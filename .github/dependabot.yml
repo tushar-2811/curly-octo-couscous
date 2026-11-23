@@ -4,6 +4,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Only propose versions that are at least 3 days old. This is stricter than the
+    # 1-day minimumReleaseAge in pnpm-workspace.yaml, so Dependabot never proposes a
+    # version that pnpm would refuse to install.
+    cooldown:
+      default-days: 3
     open-pull-requests-limit: 10
     groups:
       temporal:
@@ -19,7 +24,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
