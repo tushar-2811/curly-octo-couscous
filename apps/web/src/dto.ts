@@ -1,4 +1,5 @@
-import type { Member, Organization } from '@aiw/db';
+import type { Member, OrgUnit, Organization } from '@aiw/db';
+import type { MemberRow, OrgUnitWithCounts } from '@aiw/workforce';
 
 /** API representations. Internal columns (auth_subject, settings) never leave the server. */
 
@@ -27,10 +28,30 @@ export function memberDto(member: Member) {
     title: member.title,
     role: member.person_role,
     status: member.status,
+    signed_in: member.auth_subject !== null,
     created_at: toIso(member.created_at),
   };
 }
 
 function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+/** A member with their unit and line manager, for lists and detail pages. */
+export function memberRowDto(row: MemberRow) {
+  return {
+    ...memberDto(row),
+    org_unit: row.org_unit_id ? { id: row.org_unit_id, name: row.org_unit_name } : null,
+    manager: row.manager_id ? { id: row.manager_id, name: row.manager_name } : null,
+  };
+}
+
+export function orgUnitDto(unit: OrgUnit | OrgUnitWithCounts) {
+  return {
+    id: unit.id,
+    name: unit.name,
+    kind: unit.kind,
+    parent_id: unit.parent_id,
+    ...('member_count' in unit ? { member_count: unit.member_count } : {}),
+  };
 }

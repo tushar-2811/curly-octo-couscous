@@ -46,8 +46,31 @@ export interface MembersTable {
   auth_subject: string | null;
   status: Generated<string>;
   onboarding_checks: Json<SettingsDocument> | null;
+  org_unit_id: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+export type OrgUnitKind = 'department' | 'team' | 'other';
+
+export interface OrgUnitsTable {
+  id: Generated<string>;
+  org_id: string;
+  parent_id: string | null;
+  kind: OrgUnitKind;
+  name: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export type ReportingKind = 'line' | 'dotted';
+
+export interface ReportingLinesTable {
+  org_id: string;
+  member_id: string;
+  manager_member_id: string;
+  kind: ReportingKind;
+  created_at: Timestamp;
 }
 
 export interface AuditLogsTable {
@@ -88,6 +111,8 @@ export interface OutboxEventsTable {
 export interface Database {
   'workforce.organizations': OrganizationsTable;
   'workforce.members': MembersTable;
+  'workforce.org_units': OrgUnitsTable;
+  'workforce.reporting_lines': ReportingLinesTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }
@@ -98,3 +123,5 @@ export type OrganizationUpdate = Updateable<OrganizationsTable>;
 export type Member = Selectable<MembersTable>;
 export type NewMember = Insertable<MembersTable>;
 export type AuditLog = Selectable<AuditLogsTable>;
+export type OrgUnit = Selectable<OrgUnitsTable>;
+export type ReportingLine = Selectable<ReportingLinesTable>;

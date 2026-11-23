@@ -54,3 +54,21 @@ export async function memberForSubject(
     return result.rows[0];
   });
 }
+
+/**
+ * First sign-in of a person an admin added by email: attach their identity-provider
+ * subject to that member. Only succeeds when exactly one active, unclaimed human member
+ * has this email across all organizations.
+ */
+export async function claimMemberForEmail(
+  db: Kysely<Database>,
+  subject: string,
+  email: string,
+): Promise<{ member_id: string; org_id: string } | undefined> {
+  return asApp(db, async (trx) => {
+    const result = await sql<{ member_id: string; org_id: string }>`
+      select member_id, org_id from app.claim_member_for_email(${subject}, ${email})
+    `.execute(trx);
+    return result.rows[0];
+  });
+}

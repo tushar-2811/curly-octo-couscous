@@ -1,22 +1,38 @@
-import { Building2 } from 'lucide-react';
 import type { Metadata } from 'next';
+import { LoadError } from '@/components/load-error';
 import { PageHeader } from '@/components/page-header';
-import { EmptyState } from '@/components/ui/states';
+import { getMe } from '@/lib/api';
+import { listPeople, listUnits } from '@/lib/structure';
+import type { MemberRow, OrgUnit } from '@/lib/types';
+import { OrgChart } from './org-chart';
 
 export const metadata: Metadata = { title: 'Organization' };
+export const dynamic = 'force-dynamic';
 
-export default function Page() {
+export default async function OrganizationPage() {
+  const me = await getMe();
+  const isAdmin = me.member?.role === 'admin';
+
+  let units: OrgUnit[];
+  let people: MemberRow[];
+  try {
+    [units, people] = await Promise.all([listUnits(), listPeople({ status: 'active' })]);
+  } catch (err) {
+    return (
+      <>
+        <PageHeader title="Organization" />
+        <LoadError error={err} what="your org chart" />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
         title="Organization"
-        description="Departments, teams, people and reporting lines."
+        description="Departments and teams, and who belongs to each."
       />
-      <EmptyState
-        icon={Building2}
-        title="No organization set up yet"
-        description="Register your company and build your org chart: departments, teams, managers and AI employees."
-      />
+      <OrgChart units={units} people={people} isAdmin={isAdmin} />
     </>
   );
 }

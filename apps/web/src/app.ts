@@ -9,6 +9,7 @@ import { registerAuthRoutes } from './routes/auth';
 import { registerClientLogRoutes } from './routes/client-logs';
 import { registerHealthRoutes, type ReadinessChecks } from './routes/health';
 import { registerOrganizationRoutes } from './routes/organizations';
+import { registerStructureRoutes } from './routes/structure';
 
 export interface BuildAppOptions {
   logger: Logger;
@@ -62,6 +63,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   if (options.auth) {
     registerAuthRoutes(app, options.auth, { devLogin: options.auth.devLogin });
     registerOrganizationRoutes(app, options.auth);
+    registerStructureRoutes(app, options.auth);
   }
 
   return app;

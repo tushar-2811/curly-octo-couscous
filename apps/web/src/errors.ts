@@ -25,6 +25,14 @@ const WORKFORCE_STATUS: Record<WorkforceError['code'], number> = {
   domain_not_allowed: 422,
   not_found: 404,
   forbidden: 403,
+  name_taken: 409,
+  email_taken: 409,
+  invalid_parent: 422,
+  unit_not_empty: 409,
+  too_deep: 422,
+  invalid_manager: 422,
+  cycle: 422,
+  last_admin: 409,
 };
 
 export interface Problem {

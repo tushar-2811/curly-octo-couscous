@@ -1,4 +1,4 @@
-import { memberForSubject, withTenant } from '@aiw/db';
+import { claimMemberForEmail, memberForSubject, withTenant } from '@aiw/db';
 import { recordAudit } from '@aiw/platform';
 import { getMember, getOrganization } from '@aiw/workforce';
 import type { FastifyInstance } from 'fastify';
@@ -13,9 +13,34 @@ const devLoginBody = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(120),
 });
 
-/** Add org membership to the claims if the person has one. */
-async function withMembership(deps: AuthDeps, claims: SessionClaims): Promise<SessionClaims> {
-  const found = await memberForSubject(deps.db, claims.sub);
+/**
+ * Add org membership to the claims if the person has one. On first sign-in of someone an
+ * admin added by email, attach this identity to that member (audited as member.joined).
+ */
+async function withMembership(
+  deps: AuthDeps,
+  claims: SessionClaims,
+  requestId: string,
+): Promise<SessionClaims> {
+  let found = await memberForSubject(deps.db, claims.sub);
+  if (!found) {
+    const claimed = await claimMemberForEmail(deps.db, claims.sub, claims.email);
+    if (claimed) {
+      await withTenant(deps.db, claimed.org_id, (trx) =>
+        recordAudit(
+          trx,
+          { orgId: claimed.org_id, actorMemberId: claimed.member_id, requestId },
+          {
+            action: 'member.joined',
+            resourceType: 'member',
+            resourceId: claimed.member_id,
+            details: { email: claims.email },
+          },
+        ),
+      );
+      found = { ...claimed, status: 'active' };
+    }
+  }
   if (!found || found.status !== 'active') {
     const { mid: _m, oid: _o, ...rest } = claims;
     return rest;
@@ -37,7 +62,11 @@ export function registerAuthRoutes(
       async (request, reply) => {
         const body = devLoginBody.parse(request.body);
         const email = body.email.toLowerCase();
-        const claims = await withMembership(deps, { sub: `dev:${email}`, email, name: body.name });
+        const claims = await withMembership(
+          deps,
+          { sub: `dev:${email}`, email, name: body.name },
+          request.id,
+        );
         await setSessionCookie(reply, deps, claims);
         if (claims.oid && claims.mid) {
           const { oid, mid } = claims;
@@ -69,7 +98,7 @@ export function registerAuthRoutes(
   /** Who am I? Also upgrades the cookie if the person has joined an org since sign-in. */
   app.get('/v1/me', async (request, reply) => {
     const session = requireSession(request);
-    const claims = await withMembership(deps, session);
+    const claims = await withMembership(deps, session, request.id);
     if (claims.oid !== session.oid || claims.mid !== session.mid) {
       await setSessionCookie(reply, deps, claims);
     }

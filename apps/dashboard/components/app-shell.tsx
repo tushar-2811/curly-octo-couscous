@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Users,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -19,6 +20,7 @@ import { cn } from '@/lib/utils';
 const NAV = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/organization', label: 'Organization', icon: Building2 },
+  { href: '/people', label: 'People', icon: Users },
   { href: '/employees', label: 'AI employees', icon: Bot },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/settings', label: 'Settings', icon: Settings },
