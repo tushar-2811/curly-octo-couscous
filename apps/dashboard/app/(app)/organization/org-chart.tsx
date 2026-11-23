@@ -211,7 +211,7 @@ function PeopleList({ people }: { people: MemberRow[] }) {
       {people.map((p) => (
         <li key={p.id}>
           <Link
-            href={`/people/${p.id}`}
+            href={p.type === 'ai' ? `/employees/${p.id}` : `/people/${p.id}`}
             className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100"
           >
             {p.type === 'ai' && <Bot className="size-4 shrink-0" aria-label="AI employee" />}

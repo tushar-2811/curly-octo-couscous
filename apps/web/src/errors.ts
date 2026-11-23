@@ -33,6 +33,9 @@ const WORKFORCE_STATUS: Record<WorkforceError['code'], number> = {
   invalid_manager: 422,
   cycle: 422,
   last_admin: 409,
+  invalid_state: 409,
+  unknown_template: 422,
+  email_domain: 422,
 };
 
 export interface Problem {

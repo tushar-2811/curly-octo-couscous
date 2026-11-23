@@ -47,6 +47,43 @@ export interface MembersTable {
   status: Generated<string>;
   onboarding_checks: Json<SettingsDocument> | null;
   org_unit_id: string | null;
+  suspension_reason: SuspensionReason | null;
+  last_error: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+/** AI employee lifecycle (Identity linking §2). People use 'active' | 'deactivated'. */
+export type AiState =
+  | 'draft'
+  | 'external_identity_pending'
+  | 'identity_connected'
+  | 'integrations_pending'
+  | 'permissions_configured'
+  | 'environment_ready'
+  | 'active'
+  | 'onboarding_failed'
+  | 'suspended'
+  | 'terminated';
+
+export type SuspensionReason =
+  | 'identity_revoked'
+  | 'token_invalid'
+  | 'integration_lost'
+  | 'budget_exhausted'
+  | 'manual'
+  | 'security';
+
+export interface AiProfilesTable {
+  member_id: string;
+  org_id: string;
+  role_key: string;
+  instructions: Generated<string>;
+  /** JSON array; insert or update with a JSON string. */
+  capabilities: ColumnType<string[], string | undefined, string>;
+  max_concurrency: Generated<number>;
+  max_open_tasks: Generated<number>;
+  model_policy: ColumnType<Record<string, unknown>, string | undefined, string>;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -113,6 +150,7 @@ export interface Database {
   'workforce.members': MembersTable;
   'workforce.org_units': OrgUnitsTable;
   'workforce.reporting_lines': ReportingLinesTable;
+  'workforce.ai_profiles': AiProfilesTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }
@@ -125,3 +163,4 @@ export type NewMember = Insertable<MembersTable>;
 export type AuditLog = Selectable<AuditLogsTable>;
 export type OrgUnit = Selectable<OrgUnitsTable>;
 export type ReportingLine = Selectable<ReportingLinesTable>;
+export type AiProfile = Selectable<AiProfilesTable>;

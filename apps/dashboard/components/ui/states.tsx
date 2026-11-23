@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * The three non-data states every view must handle. Monochrome: the state is carried by
- * the icon, the wording and the border style (dashed for empty, solid black for error).
+ * The three non-data states every view must handle. The state is carried by
+ * the icon, the wording and the border (dashed grey for empty, red for error).
  */
 
 export function EmptyState({
@@ -52,11 +52,18 @@ export function ErrorState({
   className?: string;
 }) {
   return (
-    <div role="alert" className={cn('rounded-lg border border-black px-5 py-4', className)}>
+    <div
+      role="alert"
+      className={cn('rounded-lg border border-red-600 bg-red-50 px-5 py-4', className)}
+    >
       <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden strokeWidth={1.75} />
+        <AlertTriangle
+          className="mt-0.5 size-5 shrink-0 text-red-600"
+          aria-hidden
+          strokeWidth={1.75}
+        />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold">{title}</h3>
+          <h3 className="text-sm font-semibold text-red-600">{title}</h3>
           {description && <p className="mt-1 text-sm text-gray-600">{description}</p>}
           {(requestId || digest) && (
             <dl className="mt-3 space-y-0.5 font-mono text-xs text-gray-600">

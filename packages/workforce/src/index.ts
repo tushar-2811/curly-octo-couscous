@@ -29,3 +29,27 @@ export {
   type MemberFilter,
   type MemberRow,
 } from './people';
+export {
+  getEmployee,
+  hireEmployee,
+  listEmployees,
+  onboardingChecklist,
+  resumeEmployee,
+  setCompanyEmail,
+  suspendEmployee,
+  terminateEmployee,
+  updateEmployee,
+  type CheckStatus,
+  type EmployeePatch,
+  type EmployeeRow,
+  type HireInput,
+  type OnboardingCheck,
+} from './employees';
+export { AI_TRANSITIONS, canTransition, ONBOARDING_STATES, transition } from './lifecycle';
+export {
+  findRoleTemplate,
+  INTEGRATION_LABELS,
+  ROLE_TEMPLATES,
+  type IntegrationKey,
+  type RoleTemplate,
+} from './role-templates';

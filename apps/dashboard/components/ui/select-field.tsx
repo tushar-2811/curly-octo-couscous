@@ -39,7 +39,9 @@ export function SelectField({
           aria-describedby={describedBy}
           className={cn(
             'block h-9 w-full appearance-none rounded-md border bg-white pl-3 pr-9 text-sm disabled:bg-gray-100 disabled:text-gray-600',
-            error ? 'border-2 border-black' : 'border-gray-300 focus-visible:border-black',
+            error
+              ? 'border-2 border-red-600 focus-visible:outline-red-600'
+              : 'border-gray-300 focus-visible:border-black',
           )}
           {...select}
         >
@@ -60,7 +62,7 @@ export function SelectField({
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} role="alert" className="text-xs font-semibold">
+        <p id={`${id}-error`} role="alert" className="text-xs font-semibold text-red-600">
           Error: {error}
         </p>
       )}

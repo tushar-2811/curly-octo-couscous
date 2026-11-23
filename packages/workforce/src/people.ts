@@ -11,13 +11,15 @@ export interface MemberRow extends Member {
 
 export interface MemberFilter {
   type?: 'human' | 'ai';
-  status?: 'active' | 'deactivated';
+  /** A person's status, or an AI employee's lifecycle state. */
+  status?: string;
   orgUnitId?: string;
   /** Case-insensitive match on name, email or title. */
   q?: string;
 }
 
-function baseQuery(trx: Tx) {
+/** Members with their unit name and line manager. */
+export function memberRowsQuery(trx: Tx) {
   return trx
     .selectFrom('workforce.members as m')
     .leftJoin('workforce.org_units as u', 'u.id', 'm.org_unit_id')
@@ -34,7 +36,7 @@ function baseQuery(trx: Tx) {
 }
 
 export async function listMembers(trx: Tx, filter: MemberFilter = {}): Promise<MemberRow[]> {
-  let query = baseQuery(trx);
+  let query = memberRowsQuery(trx);
   if (filter.type) query = query.where('m.type', '=', filter.type);
   if (filter.status) query = query.where('m.status', '=', filter.status);
   if (filter.orgUnitId) query = query.where('m.org_unit_id', '=', filter.orgUnitId);
@@ -52,7 +54,7 @@ export async function listMembers(trx: Tx, filter: MemberFilter = {}): Promise<M
 }
 
 export async function getMemberRow(trx: Tx, id: string): Promise<MemberRow> {
-  const row = await baseQuery(trx).where('m.id', '=', id).executeTakeFirst();
+  const row = await memberRowsQuery(trx).where('m.id', '=', id).executeTakeFirst();
   if (!row) throw new WorkforceError('not_found', 'Person not found');
   return row as MemberRow;
 }
@@ -67,7 +69,7 @@ export async function directReports(trx: Tx, managerId: string) {
     .execute();
 }
 
-async function checkUnit(trx: Tx, orgUnitId: string | null | undefined): Promise<void> {
+export async function checkUnit(trx: Tx, orgUnitId: string | null | undefined): Promise<void> {
   if (!orgUnitId) return;
   const unit = await trx
     .selectFrom('workforce.org_units')
@@ -206,6 +208,16 @@ export async function updateMember(
     .executeTakeFirst();
   if (!before) throw new WorkforceError('not_found', 'Person not found');
 
+  if (before.type === 'ai' && patch.status !== undefined) {
+    throw new WorkforceError(
+      'invalid_state',
+      'Use the AI employee’s lifecycle actions to change its state',
+      'status',
+    );
+  }
+  if (before.type === 'ai' && before.status === 'terminated') {
+    throw new WorkforceError('invalid_state', 'A terminated employee can’t be changed');
+  }
   if (patch.status === 'deactivated' && id === actor.id) {
     throw new WorkforceError('forbidden', 'You can’t deactivate yourself', 'status');
   }

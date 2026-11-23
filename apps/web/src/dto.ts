@@ -1,5 +1,5 @@
 import type { Member, OrgUnit, Organization } from '@aiw/db';
-import type { MemberRow, OrgUnitWithCounts } from '@aiw/workforce';
+import type { EmployeeRow, MemberRow, OrgUnitWithCounts, RoleTemplate } from '@aiw/workforce';
 
 /** API representations. Internal columns (auth_subject, settings) never leave the server. */
 
@@ -53,5 +53,34 @@ export function orgUnitDto(unit: OrgUnit | OrgUnitWithCounts) {
     kind: unit.kind,
     parent_id: unit.parent_id,
     ...('member_count' in unit ? { member_count: unit.member_count } : {}),
+  };
+}
+
+export function roleTemplateDto(t: RoleTemplate) {
+  return {
+    key: t.key,
+    name: t.name,
+    summary: t.summary,
+    default_title: t.defaultTitle,
+    base_instructions: t.baseInstructions,
+    capabilities: t.capabilities,
+    integrations: t.integrations,
+    defaults: {
+      max_concurrency: t.defaults.maxConcurrency,
+      max_open_tasks: t.defaults.maxOpenTasks,
+    },
+  };
+}
+
+/** An AI employee: member fields, placement and its AI profile. */
+export function employeeDto(row: EmployeeRow) {
+  return {
+    ...memberRowDto(row),
+    role_key: row.role_key,
+    instructions: row.instructions,
+    max_concurrency: row.max_concurrency,
+    max_open_tasks: row.max_open_tasks,
+    suspension_reason: row.suspension_reason,
+    last_error: row.last_error,
   };
 }

@@ -1,7 +1,7 @@
 import { Bot } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { LoadError } from '@/components/load-error';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiFetch, getMe } from '@/lib/api';
@@ -47,12 +47,13 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     );
   }
 
+  if (member.type === 'ai') redirect(`/employees/${member.id}`);
+
   return (
     <>
       <BackLink />
       <div className="mb-8 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{member.display_name}</h1>
-        {member.type === 'ai' && <Bot className="size-5" aria-label="AI employee" />}
         <MemberStatus member={member} />
       </div>
       <div className="grid gap-6">
@@ -74,7 +75,10 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
               <ul className="divide-y divide-gray-300 text-sm">
                 {reports.map((r) => (
                   <li key={r.id} className="flex items-center gap-2 py-2">
-                    <Link href={`/people/${r.id}`} className="font-medium hover:underline">
+                    <Link
+                      href={r.type === 'ai' ? `/employees/${r.id}` : `/people/${r.id}`}
+                      className="font-medium hover:underline"
+                    >
                       {r.display_name}
                     </Link>
                     {r.type === 'ai' && <Bot className="size-4" aria-label="AI employee" />}

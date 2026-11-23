@@ -50,7 +50,11 @@ export default async function PeoplePage({
 
   let people: MemberRow[];
   try {
-    people = await listPeople({ q, status: status === 'all' ? undefined : status });
+    people = await listPeople({
+      type: 'human',
+      q,
+      status: status === 'all' ? undefined : status,
+    });
   } catch (err) {
     return (
       <>

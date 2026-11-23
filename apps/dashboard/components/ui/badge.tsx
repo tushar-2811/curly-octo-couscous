@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-/** Small outlined label. `solid` for the one state that needs emphasis in a list. */
+/** Small outlined label. `solid` for emphasis, `danger` (red) for errors and failures. */
 export function Badge({
   children,
   variant = 'outline',
   className,
 }: {
   children: ReactNode;
-  variant?: 'outline' | 'solid' | 'muted';
+  variant?: 'outline' | 'solid' | 'muted' | 'danger';
   className?: string;
 }) {
   return (
@@ -18,6 +18,7 @@ export function Badge({
         variant === 'outline' && 'border-black',
         variant === 'solid' && 'border-black bg-black text-white',
         variant === 'muted' && 'border-gray-300 text-gray-600',
+        variant === 'danger' && 'border-red-600 bg-red-50 text-red-600',
         className,
       )}
     >

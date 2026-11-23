@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 
 /*
- * Monochrome design system. The only colors in the product are black, white and three
- * greys. States (error, success, warning) are shown with icons, weight and borders,
- * never with color. Tailwind's default palette is removed so no other color can slip in.
+ * Monochrome design system: black, white and three greys, plus one red used only for
+ * errors and warnings (field errors, alerts, error states). Tailwind's default palette is
+ * removed so no other color can slip in.
  */
 @theme {
   --color-*: initial;
@@ -12,6 +12,8 @@
   --color-gray-100: #f2f2f2; /* subtle fills: hover rows, skeletons */
   --color-gray-300: #d4d4d4; /* borders and dividers */
   --color-gray-600: #5c5c5c; /* secondary text, disabled */
+  --color-red-50: #fdf2f2; /* error and warning backgrounds */
+  --color-red-600: #c81e1e; /* error and warning text, borders, icons (5.9:1 on white) */
   --color-transparent: transparent;
   --color-current: currentColor;
 

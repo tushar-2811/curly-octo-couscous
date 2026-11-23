@@ -68,3 +68,63 @@ export interface DirectReport {
   status: string;
   kind: 'line' | 'dotted';
 }
+
+export type AiState =
+  | 'draft'
+  | 'external_identity_pending'
+  | 'identity_connected'
+  | 'integrations_pending'
+  | 'permissions_configured'
+  | 'environment_ready'
+  | 'active'
+  | 'onboarding_failed'
+  | 'suspended'
+  | 'terminated';
+
+export const AI_STATE_LABELS: Record<AiState, string> = {
+  draft: 'Draft',
+  external_identity_pending: 'Waiting for Google account',
+  identity_connected: 'Google account linked',
+  integrations_pending: 'Waiting for tools',
+  permissions_configured: 'Permissions set',
+  environment_ready: 'Environment ready',
+  active: 'Active',
+  onboarding_failed: 'Onboarding failed',
+  suspended: 'Suspended',
+  terminated: 'Terminated',
+};
+
+export interface RoleTemplate {
+  key: string;
+  name: string;
+  summary: string;
+  default_title: string;
+  base_instructions: string;
+  capabilities: string[];
+  integrations: { key: string; required: boolean }[];
+  defaults: { max_concurrency: number; max_open_tasks: number };
+}
+
+export interface Employee extends MemberRow {
+  status: AiState;
+  role_key: string;
+  instructions: string;
+  max_concurrency: number;
+  max_open_tasks: number;
+  suspension_reason: string | null;
+  last_error: string | null;
+}
+
+export interface OnboardingCheck {
+  key: string;
+  label: string;
+  status: 'passed' | 'pending' | 'failed';
+  required: boolean;
+  detail: string;
+}
+
+export interface EmployeeDetail {
+  employee: Employee;
+  template: RoleTemplate | null;
+  onboarding: { state: AiState; onboarding: boolean; checks: OnboardingCheck[] };
+}

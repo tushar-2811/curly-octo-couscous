@@ -19,8 +19,8 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body className="flex min-h-screen items-center justify-center bg-white p-6 text-black">
-        <div role="alert" className="max-w-md rounded-lg border border-black p-6">
-          <h1 className="text-lg font-semibold">AI Workforce is unavailable</h1>
+        <div role="alert" className="max-w-md rounded-lg border border-red-600 bg-red-50 p-6">
+          <h1 className="text-lg font-semibold text-red-600">AI Workforce is unavailable</h1>
           <p className="mt-2 text-sm text-gray-600">
             An unexpected error stopped the app from loading. Try again in a moment.
           </p>

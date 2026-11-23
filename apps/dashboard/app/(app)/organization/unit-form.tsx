@@ -131,7 +131,7 @@ export function UnitForm({
         )}
       </div>
       {!editing && fieldErrors.parent_id && (
-        <p role="alert" className="text-xs font-semibold">
+        <p role="alert" className="text-xs font-semibold text-red-600">
           Error: {fieldErrors.parent_id}
         </p>
       )}

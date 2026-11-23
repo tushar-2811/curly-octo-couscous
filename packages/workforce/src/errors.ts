@@ -11,7 +11,10 @@ export type WorkforceErrorCode =
   | 'too_deep'
   | 'invalid_manager'
   | 'cycle'
-  | 'last_admin';
+  | 'last_admin'
+  | 'invalid_state'
+  | 'unknown_template'
+  | 'email_domain';
 
 /**
  * Expected failures of workforce operations. Each has a stable code; the API maps them

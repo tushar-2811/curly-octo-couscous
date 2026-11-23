@@ -9,12 +9,14 @@ export interface OrgUnitWithCounts extends OrgUnit {
   member_count: number;
 }
 
-/** All units with the number of active members directly in each. */
+/** All units with the number of current members (people and AI) directly in each. */
 export async function listOrgUnits(trx: Tx): Promise<OrgUnitWithCounts[]> {
   const rows = await trx
     .selectFrom('workforce.org_units as u')
     .leftJoin('workforce.members as m', (join) =>
-      join.onRef('m.org_unit_id', '=', 'u.id').on('m.status', '=', 'active'),
+      join
+        .onRef('m.org_unit_id', '=', 'u.id')
+        .on('m.status', 'not in', ['deactivated', 'terminated']),
     )
     .selectAll('u')
     .select((eb) => eb.fn.count<string>('m.id').as('member_count'))
@@ -65,14 +67,14 @@ async function checkParent(trx: Tx, parentId: string | null, movingId?: string):
   if (movingId && chain.includes(movingId)) {
     throw new WorkforceError(
       'cycle',
-      'A unit can’t be moved inside itself or one of its own teams',
+      'A department or team can’t be moved inside itself or one of its own teams',
       'parent_id',
     );
   }
   if (chain.length + 1 > MAX_UNIT_DEPTH) {
     throw new WorkforceError(
       'too_deep',
-      `Units can be nested at most ${MAX_UNIT_DEPTH} levels deep`,
+      `Departments and teams can be nested at most ${MAX_UNIT_DEPTH} levels deep`,
       'parent_id',
     );
   }
@@ -95,13 +97,21 @@ async function assertNameFree(
     .where(parentId ? sql<boolean>`parent_id = ${parentId}` : sql<boolean>`parent_id is null`);
   if (exceptId) query = query.where('id', '<>', exceptId);
   if (await query.executeTakeFirst()) {
-    throw new WorkforceError('name_taken', 'There is already a unit with this name here', 'name');
+    throw new WorkforceError(
+      'name_taken',
+      'There’s already a department or team with this name here',
+      'name',
+    );
   }
 }
 
 function nameTaken(err: unknown): never | void {
   if (isUniqueViolation(err, 'org_units_sibling_name_uq')) {
-    throw new WorkforceError('name_taken', 'There is already a unit with this name here', 'name');
+    throw new WorkforceError(
+      'name_taken',
+      'There’s already a department or team with this name here',
+      'name',
+    );
   }
 }
 
@@ -160,7 +170,11 @@ export async function updateOrgUnit(
   const before = await getOrgUnit(trx, id);
   if (patch.parentId !== undefined && patch.parentId !== before.parent_id) {
     if (patch.parentId === id) {
-      throw new WorkforceError('cycle', 'A unit can’t be moved inside itself', 'parent_id');
+      throw new WorkforceError(
+        'cycle',
+        'A department or team can’t be moved inside itself',
+        'parent_id',
+      );
     }
     await checkParent(trx, patch.parentId, id);
   }
@@ -226,7 +240,9 @@ export async function deleteOrgUnit(
   if (child || member) {
     throw new WorkforceError(
       'unit_not_empty',
-      child ? 'Move or delete its teams first' : 'Move its people to another unit first',
+      child
+        ? 'Move or delete its teams first'
+        : 'Move its people to another department or team first',
     );
   }
   await trx.deleteFrom('workforce.org_units').where('id', '=', id).execute();

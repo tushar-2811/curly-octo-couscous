@@ -16,7 +16,7 @@ export default async function OrganizationPage() {
   let units: OrgUnit[];
   let people: MemberRow[];
   try {
-    [units, people] = await Promise.all([listUnits(), listPeople({ status: 'active' })]);
+    [units, people] = await Promise.all([listUnits(), listPeople()]);
   } catch (err) {
     return (
       <>
@@ -26,13 +26,17 @@ export default async function OrganizationPage() {
     );
   }
 
+  // Everyone currently in the org: people who aren't deactivated and AI employees that
+  // aren't terminated (including those still onboarding).
+  const current = people.filter((p) => p.status !== 'deactivated' && p.status !== 'terminated');
+
   return (
     <>
       <PageHeader
         title="Organization"
         description="Departments and teams, and who belongs to each."
       />
-      <OrgChart units={units} people={people} isAdmin={isAdmin} />
+      <OrgChart units={units} people={current} isAdmin={isAdmin} />
     </>
   );
 }
