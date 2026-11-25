@@ -1,3 +1,4 @@
+import { grantsCheck, revokeAllGrants } from '@aiw/access';
 import { withTenant } from '@aiw/db';
 import {
   findRoleTemplate,
@@ -126,13 +127,17 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
   app.get('/v1/employees/:id', async (request) => {
     const { ctx } = await requireMember(request, db);
     const { id } = idParam.parse(request.params);
-    const row = await withTenant(db, ctx.orgId, (trx) => getEmployee(trx, id));
-    const template = findRoleTemplate(row.role_key);
-    return {
-      employee: employeeDto(row),
-      template: template ? roleTemplateDto(template) : null,
-      onboarding: onboardingChecklist(row, template),
-    };
+    return withTenant(db, ctx.orgId, async (trx) => {
+      const row = await getEmployee(trx, id);
+      const template = findRoleTemplate(row.role_key);
+      const required = (template?.integrations ?? []).filter((i) => i.required).map((i) => i.key);
+      const grants = await grantsCheck(trx, id, required);
+      return {
+        employee: employeeDto(row),
+        template: template ? roleTemplateDto(template) : null,
+        onboarding: onboardingChecklist(row, template, grants),
+      };
+    });
   });
 
   app.patch('/v1/employees/:id', async (request) => {
@@ -177,7 +182,12 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
       const { member, ctx } = await requireMember(request, db);
       const { id } = idParam.parse(request.params);
       const row = await withTenant(db, ctx.orgId, async (trx) => {
+        const before = await getEmployee(trx, id);
         await run(trx, ctx, member, id);
+        // Termination ends all access in the same transaction (PRD SEC-11).
+        if (action === 'terminate' && before.status !== 'terminated') {
+          await revokeAllGrants(trx, ctx, id, 'terminated');
+        }
         return getEmployee(trx, id);
       });
       request.log.info(

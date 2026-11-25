@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMe } from '@/lib/api';
 import { ROLE_LABELS } from '@/lib/types';
 import { OrgNameForm } from './org-name-form';
+import { formatDate } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Settings' };
 export const dynamic = 'force-dynamic';
@@ -45,7 +46,7 @@ export default async function SettingsPage() {
                   </span>
                 }
               />
-              <Row label="Created" value={new Date(org.created_at).toLocaleDateString()} />
+              <Row label="Created" value={formatDate(org.created_at)} />
             </dl>
             {!org.domain_verified && (
               <p className="text-xs text-gray-600">

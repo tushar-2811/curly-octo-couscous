@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClientApiError, clientFetch } from '@/lib/client-api';
 import { ROLE_LABELS, type MemberRow, type OrgUnit } from '@/lib/types';
 import { PersonForm } from '../person-form';
+import { formatDate } from '@/lib/utils';
 
 /** Profile card: read-only for everyone; admins can edit and change access. */
 export function PersonDetail({
@@ -73,7 +74,7 @@ export function PersonDetail({
                   value={member.signed_in ? 'Yes' : 'Not yet — they join on first sign-in'}
                 />
               )}
-              <Row label="Added" value={new Date(member.created_at).toLocaleDateString()} />
+              <Row label="Added" value={formatDate(member.created_at)} />
             </dl>
           )}
         </CardContent>

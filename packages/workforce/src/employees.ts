@@ -331,10 +331,17 @@ const PRE_IDENTITY: readonly string[] = ['draft', 'external_identity_pending'];
 
 /**
  * Onboarding checklist for steps 1–4 (Architecture refinement §E), derived from the
- * employee's current data. Tool connections and grants arrive in later slices, so those
- * checks stay pending until then.
+ * employee's current data. Tool connections arrive in Phase 2, so those checks stay
+ * pending until then; the grants check comes from the Access module.
  */
-export function onboardingChecklist(employee: EmployeeRow, template: RoleTemplate | undefined) {
+export function onboardingChecklist(
+  employee: EmployeeRow,
+  template: RoleTemplate | undefined,
+  grants: { passed: boolean; detail: string } = {
+    passed: false,
+    detail: 'No repositories, projects or spaces granted yet',
+  },
+) {
   const state = employee.status as AiState;
   const identityDone = !PRE_IDENTITY.includes(state) && state !== 'terminated';
   const checks: OnboardingCheck[] = [
@@ -380,9 +387,9 @@ export function onboardingChecklist(employee: EmployeeRow, template: RoleTemplat
     {
       key: 'grants',
       label: 'Access grants',
-      status: 'pending',
+      status: grants.passed ? 'passed' : 'pending',
       required: true,
-      detail: 'No repositories, projects or spaces granted yet',
+      detail: grants.detail,
     },
   ];
   if (state === 'onboarding_failed') {

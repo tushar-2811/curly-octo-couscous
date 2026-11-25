@@ -3,6 +3,7 @@
 import {
   Bot,
   Building2,
+  KeyRound,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -22,6 +23,7 @@ const NAV = [
   { href: '/organization', label: 'Organization', icon: Building2 },
   { href: '/people', label: 'People', icon: Users },
   { href: '/employees', label: 'AI employees', icon: Bot },
+  { href: '/access', label: 'Access', icon: KeyRound },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;

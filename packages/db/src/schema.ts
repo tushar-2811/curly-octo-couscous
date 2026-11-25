@@ -110,6 +110,51 @@ export interface ReportingLinesTable {
   created_at: Timestamp;
 }
 
+export type ResourceType = 'repo' | 'jira_project' | 'chat_space' | 'figma_file';
+export type GrantEffect = 'allow' | 'deny';
+export type GrantLevel = 'read' | 'write' | 'admin';
+
+/** Small fixed set of grant conditions (Technical architecture §11). */
+export interface GrantConditions {
+  /** Type-wide grants only: resources carrying any of these tags. */
+  tags?: string[];
+  /** Repository write: branches the employee may push to (glob patterns, * = anything). */
+  branches?: string[];
+}
+
+export interface ResourcesTable {
+  id: Generated<string>;
+  org_id: string;
+  connection_id: string | null;
+  type: ResourceType;
+  external_id: string;
+  name: string;
+  url: string | null;
+  tags: ColumnType<string[], string[] | undefined, string[]>;
+  created_by: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  archived_at: Timestamp | null;
+}
+
+export interface GrantsTable {
+  id: Generated<string>;
+  org_id: string;
+  member_id: string;
+  resource_type: ResourceType;
+  resource_id: string | null;
+  effect: GrantEffect;
+  level: GrantLevel;
+  /** JSON object; insert or update with a JSON string. */
+  conditions: ColumnType<GrantConditions, string | undefined, string>;
+  granted_by: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  revoke_reason: string | null;
+}
+
 export interface AuditLogsTable {
   id: Generated<string>;
   org_id: string | null;
@@ -151,6 +196,8 @@ export interface Database {
   'workforce.org_units': OrgUnitsTable;
   'workforce.reporting_lines': ReportingLinesTable;
   'workforce.ai_profiles': AiProfilesTable;
+  'access.resources': ResourcesTable;
+  'access.grants': GrantsTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }
@@ -164,3 +211,5 @@ export type AuditLog = Selectable<AuditLogsTable>;
 export type OrgUnit = Selectable<OrgUnitsTable>;
 export type ReportingLine = Selectable<ReportingLinesTable>;
 export type AiProfile = Selectable<AiProfilesTable>;
+export type Resource = Selectable<ResourcesTable>;
+export type Grant = Selectable<GrantsTable>;

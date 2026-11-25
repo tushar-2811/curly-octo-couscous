@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { AccessError } from '@aiw/access';
 import { WorkforceError } from '@aiw/workforce';
 import { ZodError } from 'zod';
 
@@ -36,6 +37,16 @@ const WORKFORCE_STATUS: Record<WorkforceError['code'], number> = {
   invalid_state: 409,
   unknown_template: 422,
   email_domain: 422,
+};
+
+const ACCESS_STATUS: Record<AccessError['code'], number> = {
+  not_found: 404,
+  forbidden: 403,
+  invalid_state: 409,
+  resource_exists: 409,
+  grant_exists: 409,
+  invalid_resource: 422,
+  invalid_grant: 422,
 };
 
 export interface Problem {
@@ -97,8 +108,9 @@ export function errorHandler(
     );
   }
 
-  if (error instanceof WorkforceError) {
-    const status = WORKFORCE_STATUS[error.code];
+  if (error instanceof WorkforceError || error instanceof AccessError) {
+    const status =
+      error instanceof AccessError ? ACCESS_STATUS[error.code] : WORKFORCE_STATUS[error.code];
     const extras = error.field
       ? { errors: [{ path: error.field, message: error.message }] }
       : undefined;

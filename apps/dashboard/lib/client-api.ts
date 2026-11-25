@@ -64,7 +64,9 @@ export async function clientFetch<T>(
   const fieldErrors: Record<string, string> = {};
   if (Array.isArray(body?.errors)) {
     for (const e of body.errors as { path?: string; message?: string }[]) {
-      if (e.path && e.message && !fieldErrors[e.path]) fieldErrors[e.path] = e.message;
+      // A list item's error ("tags.2") belongs to the list's field ("tags").
+      const path = e.path?.replace(/\.\d+(\..*)?$/, '');
+      if (path && e.message && !fieldErrors[path]) fieldErrors[path] = e.message;
     }
   }
   const error = new ClientApiError(

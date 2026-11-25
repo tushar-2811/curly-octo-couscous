@@ -1,0 +1,21 @@
+{
+  "name": "@aiw/access",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aiw/db": "workspace:*",
+    "@aiw/logger": "workspace:*",
+    "@aiw/platform": "workspace:*"
+  },
+  "devDependencies": {
+    "@aiw/workforce": "workspace:*"
+  }
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle, Check, Circle } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { FormAlert } from '@/components/form-alert';
@@ -108,8 +109,15 @@ export function Onboarding({
             ))}
           </ul>
           <p className="mt-2 text-xs text-gray-600">
-            Google sign-in linking, tool connections and access grants are set up in the next
-            updates. Until then those items stay pending.
+            Google sign-in linking and tool connections are set up in the next updates. Until then
+            those items stay pending. Grant access on the{' '}
+            <Link
+              href={`/employees/${employee.id}/access`}
+              className="underline underline-offset-4"
+            >
+              access page
+            </Link>
+            .
           </p>
         </section>
       </CardContent>
