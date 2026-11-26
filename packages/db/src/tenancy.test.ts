@@ -39,7 +39,6 @@ describe.skipIf(!url)('tenant isolation', () => {
             name,
             slug: `${name.toLowerCase()}-${suffix}`,
             domain: `${name.toLowerCase()}-${suffix}.test`,
-            domain_verification_token: 't',
           })
           .execute();
         await trx

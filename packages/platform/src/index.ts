@@ -102,3 +102,4 @@ export async function recordChange(
   if (event) await emitEvent(trx, ctx, event);
 }
 export { deleteSecret, readSecret, SecretBox, storeSecret } from './secrets';
+export { auditFacets, searchAudit, type AuditFilter } from './audit-query';

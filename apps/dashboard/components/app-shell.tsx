@@ -7,6 +7,7 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  ScrollText,
   Settings,
   Users,
   X,
@@ -23,6 +24,7 @@ const NAV = [
   { href: '/people', label: 'People', icon: Users },
   { href: '/employees', label: 'AI employees', icon: Bot },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/audit', label: 'Audit log', icon: ScrollText, auditorsOnly: true },
   { href: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
@@ -34,10 +36,13 @@ export function AppShell({
   children,
   orgName,
   user,
+  canAudit,
 }: {
   children: ReactNode;
   orgName: string;
   user: { name: string; email: string };
+  /** Admins and security admins see the audit log. */
+  canAudit: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -45,23 +50,25 @@ export function AppShell({
 
   const nav = (
     <nav aria-label="Main" className="flex flex-col gap-1">
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? 'page' : undefined}
-            className={cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-              active ? 'bg-black text-white' : 'text-black hover:bg-gray-100',
-            )}
-          >
-            <Icon className="size-4" aria-hidden strokeWidth={1.75} />
-            {label}
-          </Link>
-        );
-      })}
+      {NAV.filter((item) => canAudit || !('auditorsOnly' in item)).map(
+        ({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                active ? 'bg-black text-white' : 'text-black hover:bg-gray-100',
+              )}
+            >
+              <Icon className="size-4" aria-hidden strokeWidth={1.75} />
+              {label}
+            </Link>
+          );
+        },
+      )}
     </nav>
   );
 

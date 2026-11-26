@@ -95,7 +95,6 @@ describe.skipIf(!url)('sign-in and organizations API', () => {
     expect(created.json().organization).toMatchObject({
       name: 'Acme Robotics',
       domain: `acme-${run}.test`,
-      domain_verified: false,
     });
     expect(created.json().member).toMatchObject({ role: 'admin' });
     cookie = `${SESSION_COOKIE}=${created.cookies.find((c) => c.name === SESSION_COOKIE)?.value}`;

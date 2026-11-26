@@ -3,17 +3,12 @@ import type { EmployeeRow, MemberRow, OrgUnitWithCounts, RoleTemplate } from '@a
 
 /** API representations. Internal columns (auth_subject, settings) never leave the server. */
 
-export function organizationDto(org: Organization, viewer: Pick<Member, 'person_role'>) {
+export function organizationDto(org: Organization) {
   return {
     id: org.id,
     name: org.name,
     slug: org.slug,
     domain: org.domain,
-    domain_verified: org.domain_verified_at !== null,
-    // Admins need the token to add the DNS record (slice 6); others don't see it.
-    ...(viewer.person_role === 'admin'
-      ? { domain_verification_token: org.domain_verification_token }
-      : {}),
     status: org.status,
     created_at: toIso(org.created_at),
   };

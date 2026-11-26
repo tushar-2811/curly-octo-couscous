@@ -1,4 +1,3 @@
-import { CheckCircle2, CircleDashed } from 'lucide-react';
 import type { Metadata } from 'next';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,26 +32,8 @@ export default async function SettingsPage() {
             )}
             <dl className="divide-y divide-gray-300 border-t border-gray-300 text-sm">
               <Row label="Domain" value={<span className="font-mono">{org.domain}</span>} />
-              <Row
-                label="Domain verification"
-                value={
-                  <span className="flex items-center gap-1.5">
-                    {org.domain_verified ? (
-                      <CheckCircle2 className="size-4" aria-hidden />
-                    ) : (
-                      <CircleDashed className="size-4" aria-hidden />
-                    )}
-                    {org.domain_verified ? 'Verified' : 'Not verified yet'}
-                  </span>
-                }
-              />
               <Row label="Created" value={formatDate(org.created_at)} />
             </dl>
-            {!org.domain_verified && (
-              <p className="text-xs text-gray-600">
-                Domain verification with a DNS TXT record is coming in a later update.
-              </p>
-            )}
           </CardContent>
         </Card>
 

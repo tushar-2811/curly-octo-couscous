@@ -22,8 +22,6 @@ export interface OrganizationsTable {
   name: string;
   slug: string;
   domain: string;
-  domain_verification_token: string;
-  domain_verified_at: Timestamp | null;
   google_customer_id: string | null;
   status: Generated<'active' | 'suspended'>;
   data_region: Generated<string>;

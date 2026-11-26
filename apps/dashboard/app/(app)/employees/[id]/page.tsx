@@ -41,6 +41,7 @@ export default async function EmployeePage({
   if (!UUID.test(id)) notFound();
   const me = await getMe();
   const isAdmin = me.member?.role === 'admin';
+  const canAudit = isAdmin || me.member?.role === 'security_admin';
 
   let detail: EmployeeDetail;
   let units: OrgUnit[] = [];
@@ -73,6 +74,14 @@ export default async function EmployeePage({
           <Bot className="size-6" aria-hidden />
           <h1 className="text-2xl font-semibold tracking-tight">{employee.display_name}</h1>
           <EmployeeState state={employee.status} />
+          {canAudit && (
+            <Link
+              href={`/audit?resource=${employee.id}`}
+              className="ml-auto text-sm text-gray-600 underline underline-offset-4 hover:text-black"
+            >
+              History
+            </Link>
+          )}
         </div>
         <p className="mt-1 text-sm text-gray-600">
           {employee.title}

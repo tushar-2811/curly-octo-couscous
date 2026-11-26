@@ -42,15 +42,15 @@ export function registerOrganizationRoutes(app: FastifyInstance, deps: AuthDeps)
     );
     return reply
       .status(201)
-      .send({ organization: organizationDto(organization, member), member: memberDto(member) });
+      .send({ organization: organizationDto(organization), member: memberDto(member) });
   });
 
   app.get('/v1/orgs/current', async (request) => {
-    const { member, ctx } = await requireMember(request, deps.db);
+    const { ctx } = await requireMember(request, deps.db);
     const organization = await withTenant(deps.db, ctx.orgId, (trx) =>
       getOrganization(trx, ctx.orgId),
     );
-    return { organization: organizationDto(organization, member) };
+    return { organization: organizationDto(organization) };
   });
 
   app.patch('/v1/orgs/current', async (request) => {
@@ -60,6 +60,6 @@ export function registerOrganizationRoutes(app: FastifyInstance, deps: AuthDeps)
       updateOrganization(trx, ctx, member, { name: body.name }),
     );
     request.log.info({ org_id: ctx.orgId }, 'organization updated');
-    return { organization: organizationDto(organization, member) };
+    return { organization: organizationDto(organization) };
   });
 }

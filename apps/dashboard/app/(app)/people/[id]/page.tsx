@@ -21,6 +21,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   if (!UUID.test(id)) notFound();
   const me = await getMe();
   const isAdmin = me.member?.role === 'admin';
+  const canAudit = isAdmin || me.member?.role === 'security_admin';
 
   let member: MemberRow;
   let reports: DirectReport[];
@@ -55,6 +56,14 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
       <div className="mb-8 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">{member.display_name}</h1>
         <MemberStatus member={member} />
+        {canAudit && (
+          <Link
+            href={`/audit?resource=${member.id}`}
+            className="ml-auto text-sm text-gray-600 underline underline-offset-4 hover:text-black"
+          >
+            History
+          </Link>
+        )}
       </div>
       <div className="grid gap-6">
         <PersonDetail

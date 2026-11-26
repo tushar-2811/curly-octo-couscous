@@ -104,7 +104,6 @@ export async function registerOrganization(
           name: input.orgName.trim(),
           slug,
           domain,
-          domain_verification_token: `aiw-verify-${randomBytes(16).toString('hex')}`,
         })
         .returningAll()
         .executeTakeFirstOrThrow();

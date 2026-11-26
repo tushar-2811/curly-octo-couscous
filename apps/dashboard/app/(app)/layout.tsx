@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <AppShell
       orgName={me.organization.name}
       user={{ name: me.member.display_name, email: me.user.email }}
+      canAudit={me.member.role === 'admin' || me.member.role === 'security_admin'}
     >
       {children}
     </AppShell>

@@ -112,6 +112,6 @@ export function registerAuthRoutes(
     if (member.status !== 'active') {
       throw new AppError(401, 'unauthenticated', 'Sign in required', 'Your access has changed.');
     }
-    return { user, member: memberDto(member), organization: organizationDto(organization, member) };
+    return { user, member: memberDto(member), organization: organizationDto(organization) };
   });
 }

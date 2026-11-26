@@ -5,8 +5,6 @@ export interface Organization {
   name: string;
   slug: string;
   domain: string;
-  domain_verified: boolean;
-  domain_verification_token?: string;
   status: 'active' | 'suspended';
   created_at: string;
 }

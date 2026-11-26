@@ -5,6 +5,7 @@ import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } 
 import { registerSession, type AuthDeps } from './auth';
 import { AppError, errorHandler, notFoundHandler } from './errors';
 import { genRequestId, registerRequestContext } from './request-context';
+import { registerAuditRoutes } from './routes/audit';
 import { registerAuthRoutes } from './routes/auth';
 import { registerClientLogRoutes } from './routes/client-logs';
 import { registerHealthRoutes, type ReadinessChecks } from './routes/health';
@@ -68,6 +69,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     registerStructureRoutes(app, options.auth);
     registerEmployeeRoutes(app, options.auth);
     registerIdentityRoutes(app, options.auth);
+    registerAuditRoutes(app, options.auth);
   }
 
   return app;
