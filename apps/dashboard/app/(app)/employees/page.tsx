@@ -65,7 +65,7 @@ export default async function EmployeesPage({
           title="No AI employees yet"
           description={
             isAdmin
-              ? 'Hire your first AI engineer from a role template. You will link its Google Workspace account and grant it access during onboarding.'
+              ? 'Hire your first AI engineer from a role template. During onboarding you link the company Google account your IT team created for it.'
               : 'An admin has not hired any AI employees yet.'
           }
           action={

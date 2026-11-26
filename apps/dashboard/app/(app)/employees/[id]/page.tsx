@@ -1,13 +1,12 @@
-import { Bot, ChevronRight } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { LoadError } from '@/components/load-error';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiFetch, getMe } from '@/lib/api';
 import { ApiError } from '@/lib/api-error';
 import { listPeople, listUnits } from '@/lib/structure';
-import type { EmployeeDetail, MemberRow, OnboardingCheck, OrgUnit } from '@/lib/types';
+import type { EmployeeDetail, MemberRow, OrgUnit } from '@/lib/types';
 import { EmployeeState } from '../employee-state';
 import { Lifecycle } from './lifecycle';
 import { Onboarding } from './onboarding';
@@ -84,32 +83,9 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
           people={people}
           canEdit={isAdmin && !terminated}
         />
-        <AccessSummary id={employee.id} check={onboarding.checks.find((c) => c.key === 'grants')} />
         {isAdmin && !terminated && <Lifecycle employee={employee} />}
       </div>
     </>
-  );
-}
-
-function AccessSummary({ id, check }: { id: string; check: OnboardingCheck | undefined }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Access</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-600">
-          {check?.status === 'passed' ? `Granted: ${check.detail}` : (check?.detail ?? '')}
-        </p>
-        <Link
-          href={`/employees/${id}/access`}
-          className="inline-flex h-8 items-center gap-1 rounded-md border border-black px-3 text-sm font-medium hover:bg-gray-100"
-        >
-          Repositories, projects and spaces
-          <ChevronRight className="size-4" aria-hidden />
-        </Link>
-      </CardContent>
-    </Card>
   );
 }
 

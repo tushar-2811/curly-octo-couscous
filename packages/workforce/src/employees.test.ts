@@ -102,7 +102,6 @@ describe.skipIf(!url)('hiring AI employees', () => {
         identity: 'pending',
         team: 'passed',
         manager: 'passed',
-        grants: 'pending',
         figma: 'pending',
       });
       expect(checklist.onboarding).toBe(true);

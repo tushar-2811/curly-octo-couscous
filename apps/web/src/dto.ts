@@ -1,5 +1,4 @@
-import type { EffectiveRow, GrantRow, ResourceRow } from '@aiw/access';
-import type { Member, OrgUnit, Organization, Resource } from '@aiw/db';
+import type { Member, OrgUnit, Organization } from '@aiw/db';
 import type { EmployeeRow, MemberRow, OrgUnitWithCounts, RoleTemplate } from '@aiw/workforce';
 
 /** API representations. Internal columns (auth_subject, settings) never leave the server. */
@@ -83,54 +82,5 @@ export function employeeDto(row: EmployeeRow) {
     max_open_tasks: row.max_open_tasks,
     suspension_reason: row.suspension_reason,
     last_error: row.last_error,
-  };
-}
-
-export function resourceDto(r: Resource | ResourceRow) {
-  return {
-    id: r.id,
-    type: r.type,
-    external_id: r.external_id,
-    name: r.name,
-    url: r.url,
-    tags: r.tags,
-    archived: r.archived_at !== null,
-    created_at: toIso(r.created_at),
-    ...('grant_count' in r ? { grant_count: r.grant_count } : {}),
-  };
-}
-
-export function grantDto(g: GrantRow) {
-  return {
-    id: g.id,
-    resource_type: g.resource_type,
-    resource: g.resource_id
-      ? {
-          id: g.resource_id,
-          name: g.resource_name,
-          external_id: g.resource_external_id,
-          url: g.resource_url,
-          archived: g.resource_archived,
-        }
-      : null,
-    effect: g.effect,
-    level: g.level,
-    tags: g.conditions.tags ?? [],
-    branches: g.conditions.branches ?? [],
-    granted_by: g.granted_by ? { id: g.granted_by, name: g.granted_by_name } : null,
-    created_at: toIso(g.created_at),
-    updated_at: toIso(g.updated_at),
-    revoked_at: g.revoked_at ? toIso(g.revoked_at) : null,
-    revoke_reason: g.revoke_reason,
-  };
-}
-
-export function effectiveDto(e: EffectiveRow) {
-  return {
-    resource: e.resource,
-    level: e.level,
-    branches: e.branches,
-    limited_by_deny: e.limited_by_deny,
-    grant_ids: e.grant_ids,
   };
 }

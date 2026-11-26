@@ -103,9 +103,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@aiw/access':
-        specifier: workspace:*
-        version: link:../../packages/access
       '@aiw/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -171,22 +168,6 @@ importers:
       tsup:
         specifier: ^9.0.0
         version: 9.0.0(@swc/core@1.16.22)(jiti@2.7.0)(postcss@8.5.33)(tsx@4.23.15)(typescript@5.9.3)(yaml@2.9.1)
-
-  packages/access:
-    dependencies:
-      '@aiw/db':
-        specifier: workspace:*
-        version: link:../db
-      '@aiw/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@aiw/platform':
-        specifier: workspace:*
-        version: link:../platform
-    devDependencies:
-      '@aiw/workforce':
-        specifier: workspace:*
-        version: link:../workforce
 
   packages/config:
     dependencies:

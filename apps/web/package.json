@@ -12,7 +12,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aiw/access": "workspace:*",
     "@aiw/config": "workspace:*",
     "@aiw/db": "workspace:*",
     "@aiw/logger": "workspace:*",

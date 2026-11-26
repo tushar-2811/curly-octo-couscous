@@ -81,8 +81,9 @@ export function Lifecycle({ employee }: { employee: Employee }) {
           <div>
             <h3 className="text-sm font-semibold text-red-600">Terminate</h3>
             <p className="mt-1 text-sm text-gray-600">
-              Permanently ends this employee. Its access is revoked and it can never work again. Its
-              profile and history are kept. This can’t be undone.
+              Permanently ends this employee. It can never work again; its profile and history are
+              kept. This can’t be undone. Remove its company account from your tools as you would
+              for a person who leaves.
             </p>
           </div>
           {confirming ? (

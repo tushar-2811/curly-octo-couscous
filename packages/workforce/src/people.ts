@@ -237,7 +237,7 @@ export async function updateMember(
   const changes = {
     ...(patch.displayName !== undefined ? { display_name: patch.displayName.trim() } : {}),
     ...(patch.title !== undefined ? { title: patch.title?.trim() || null } : {}),
-    // Roles apply to people only; AI employees are governed by grants.
+    // Roles apply to people only; AI employees get access inside each tool.
     ...(patch.role !== undefined && before.type === 'human' ? { person_role: patch.role } : {}),
     ...(patch.orgUnitId !== undefined ? { org_unit_id: patch.orgUnitId } : {}),
     ...(patch.status !== undefined ? { status: patch.status } : {}),
