@@ -29,3 +29,31 @@ export {
 } from './llm';
 export { listInbox, MAX_BODY, recordInbound, type InboundInput, type InboxEntry } from './messages';
 export { EngineError, processMessage, type EngineDeps, type ProcessResult } from './process';
+export {
+  ACK_TEXT,
+  ANSWER_JSON_SCHEMA,
+  ANSWER_PROMPT_VERSION,
+  answerPrompt,
+  draftReply,
+  replyTask,
+  type AnswerInput,
+  type ReplyTask,
+} from './answer';
+export {
+  EmbeddingError,
+  toVectorLiteral,
+  VoyageEmbedder,
+  type Embedder,
+  type EmbedResult,
+} from './embeddings';
+export {
+  embedPending,
+  embedQuery,
+  messageMemoryText,
+  readersFor,
+  rememberMessage,
+  searchMemory,
+  wordsQuery,
+  type MemoryHit,
+  type Readers,
+} from './memory';

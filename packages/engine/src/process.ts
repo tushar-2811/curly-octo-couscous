@@ -3,12 +3,17 @@ import {
   type Database,
   type InboundMessage,
   type Kysely,
+  type MemoryItem,
   type MessageDecision,
+  type OutboundMessage,
 } from '@aiw/db';
 import type { Logger } from '@aiw/logger';
 import { recordChange } from '@aiw/platform';
 import { PROMPT_VERSION, type Classification } from './classification';
+import { ACK_TEXT, ANSWER_PROMPT_VERSION, draftReply, replyTask } from './answer';
 import { classifyMessage } from './classifier';
+import type { Embedder } from './embeddings';
+import { embedQuery, readersFor, rememberMessage, searchMemory } from './memory';
 import { decide, DEFAULT_POLICY, type Decision, type DecisionPolicy } from './decide';
 import { computeFacts, type AddressingFacts } from './facts';
 import { LlmError, type LlmErrorCode, type StructuredLlm, type StructuredResult } from './llm';
@@ -17,6 +22,8 @@ export interface EngineDeps {
   db: Kysely<Database>;
   /** Null when no model is configured: messages are stored and decided without one. */
   llm: StructuredLlm | null;
+  /** Null when no embedding key is set: memory is searched by words only. */
+  embedder?: Embedder | null;
   logger: Logger;
   policy?: DecisionPolicy;
 }
@@ -27,6 +34,10 @@ export interface ProcessResult {
   facts: AddressingFacts;
   classification: Classification | null;
   corrections: string[];
+  /** The memory item saved for this message, when it was worth keeping. */
+  memory: MemoryItem | null;
+  /** The "looking into it" note and the reply, oldest first. */
+  replies: OutboundMessage[];
   /** True when the message had already been decided and nothing ran again. */
   alreadyDecided: boolean;
 }
@@ -71,7 +82,13 @@ export async function processMessage(
         .where('message_id', '=', messageId)
         .orderBy('id', 'desc')
         .executeTakeFirstOrThrow();
-      return { done: true as const, message, decision };
+      const replies = await trx
+        .selectFrom('conversations.outbound_messages')
+        .selectAll()
+        .where('in_reply_to', '=', messageId)
+        .orderBy('id')
+        .execute();
+      return { done: true as const, message, decision, replies };
     }
     const employee = await trx
       .selectFrom('workforce.members as m')
@@ -121,6 +138,8 @@ export async function processMessage(
       facts: loaded.decision.facts as unknown as AddressingFacts,
       classification: loaded.decision.classification as Classification | null,
       corrections: [],
+      memory: null,
+      replies: loaded.replies,
       alreadyDecided: true,
     };
   }
@@ -244,6 +263,125 @@ export async function processMessage(
     return { row, updated };
   });
 
+  // Memory and the reply. A message left to retry gets them on the next attempt.
+  const memoryDeps = { db: deps.db, embedder: deps.embedder ?? null, logger: log };
+  const keep = !retryable && decision.action !== 'ignore' && decision.action !== 'decline';
+  const wantsReply =
+    !retryable &&
+    deps.llm !== null &&
+    (decision.action === 'reply' || decision.action === 'acknowledge');
+  const queryText = [message.subject, message.body].filter(Boolean).join('\n');
+  const [memory, vector] = await Promise.all([
+    keep
+      ? rememberMessage(memoryDeps, orgId, saved.updated).catch((err: unknown) => {
+          log.error({ err }, 'could not save the message to memory');
+          return null;
+        })
+      : Promise.resolve(null),
+    wantsReply ? embedQuery(memoryDeps, queryText) : Promise.resolve(null),
+  ]);
+
+  let replies: OutboundMessage[] = [];
+  if (wantsReply && deps.llm) {
+    const outStatus: 'draft' | 'queued' = message.source === 'simulated' ? 'draft' : 'queued';
+    const base = { org_id: orgId, employee_id: employee.id, in_reply_to: messageId };
+    const readers = readersFor(saved.updated);
+    const evidence = await withTenant(deps.db, orgId, (trx) =>
+      searchMemory(trx, {
+        employeeId: employee.id,
+        readers,
+        text: queryText,
+        vector,
+        excludeSourceIds: [messageId],
+      }),
+    );
+    const task = replyTask(decision, classification);
+    let row: Parameters<typeof insertReplies>[2][number];
+    try {
+      const draft = await draftReply(deps.llm, {
+        employee: { name: employee.display_name, role: employee.title ?? employee.role_key },
+        senderName: message.sender_name ?? message.sender_email ?? 'Someone',
+        where:
+          message.space_type === 'direct'
+            ? 'direct message to you'
+            : (message.space_name ?? 'a shared space'),
+        body: queryText,
+        thread: thread.map((t) => ({
+          sender:
+            t.sender_member_id === employee.id
+              ? employee.display_name
+              : (t.sender_name ?? t.sender_email ?? 'someone'),
+          text: t.body.length > THREAD_SNIPPET ? `${t.body.slice(0, THREAD_SNIPPET)}…` : t.body,
+        })),
+        task,
+        evidence,
+        unavailable: decision.needs.filter((n) => n !== 'memory'),
+      });
+      row = {
+        ...base,
+        kind: 'reply',
+        body: draft.reply,
+        status: outStatus,
+        answered: draft.answered,
+        sources: JSON.stringify(
+          draft.used.map((u) => ({ memory_id: u.id, snippet: u.content.slice(0, 300) })),
+        ),
+        model: draft.call.model,
+        latency_ms: draft.call.latencyMs,
+        input_tokens: draft.call.inputTokens,
+        output_tokens: draft.call.outputTokens,
+        error_code: null,
+      };
+      log.info(
+        {
+          task,
+          answered: draft.answered,
+          evidence: evidence.length,
+          used: draft.used.length,
+          model_ms: draft.call.latencyMs,
+          input_tokens: draft.call.inputTokens,
+          output_tokens: draft.call.outputTokens,
+          prompt_version: ANSWER_PROMPT_VERSION,
+        },
+        'reply drafted',
+      );
+    } catch (err) {
+      if (!(err instanceof LlmError)) throw err;
+      log.error({ err, code: err.code }, 'could not draft a reply');
+      row = {
+        ...base,
+        kind: 'reply',
+        body: 'No reply could be drafted.',
+        status: 'failed',
+        answered: null,
+        sources: '[]',
+        model: deps.llm.model,
+        latency_ms: null,
+        input_tokens: null,
+        output_tokens: null,
+        error_code: err.code,
+      };
+    }
+    const ack = decision.ackFirst
+      ? [
+          {
+            ...base,
+            kind: 'ack' as const,
+            body: ACK_TEXT,
+            status: outStatus,
+            answered: null,
+            sources: '[]',
+            model: null,
+            latency_ms: null,
+            input_tokens: null,
+            output_tokens: null,
+            error_code: null,
+          },
+        ]
+      : [];
+    replies = await insertReplies(deps, orgId, [...ack, row]);
+  }
+
   log.info(
     {
       employee_id: employee.id,
@@ -269,6 +407,8 @@ export async function processMessage(
     facts,
     classification,
     corrections,
+    memory,
+    replies,
     alreadyDecided: false,
   };
 }
@@ -288,4 +428,28 @@ async function markFailed(deps: EngineDeps, orgId: string, messageId: string, er
   } catch (markErr) {
     deps.logger.error({ err: markErr, message_id: messageId }, 'could not mark message failed');
   }
+}
+
+async function insertReplies(
+  deps: EngineDeps,
+  orgId: string,
+  rows: {
+    org_id: string;
+    employee_id: string;
+    in_reply_to: string;
+    kind: 'reply' | 'ack';
+    body: string;
+    status: 'draft' | 'queued' | 'failed';
+    answered: 'yes' | 'partly' | 'no' | null;
+    sources: string;
+    model: string | null;
+    latency_ms: number | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    error_code: string | null;
+  }[],
+): Promise<OutboundMessage[]> {
+  return withTenant(deps.db, orgId, (trx) =>
+    trx.insertInto('conversations.outbound_messages').values(rows).returningAll().execute(),
+  );
 }

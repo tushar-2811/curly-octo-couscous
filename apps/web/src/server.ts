@@ -1,6 +1,6 @@
 import { createDb, pingDb } from '@aiw/db';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
-import { OpenAiLlm } from '@aiw/engine';
+import { OpenAiLlm, VoyageEmbedder } from '@aiw/engine';
 import { SecretBox } from '@aiw/platform';
 import { buildApp } from './app';
 import { loadWebConfig } from './config';
@@ -68,6 +68,9 @@ const app = await buildApp({
             timeoutMs: config.LLM_TIMEOUT_MS,
           })
         : null,
+      embedder: config.VOYAGE_API_KEY
+        ? new VoyageEmbedder({ apiKey: config.VOYAGE_API_KEY, model: config.VOYAGE_MODEL })
+        : null,
       // Typed test messages are for trying the classifier before Chat and Gmail intake.
       allowTestMessages: config.APP_ENV === 'local' || config.APP_ENV === 'dev',
     },
@@ -93,6 +96,11 @@ if (config.OPENAI_API_KEY) {
   logger.info({ model: config.OPENAI_MODEL }, 'message classifier enabled');
 } else {
   logger.warn('message classifier is off: OPENAI_API_KEY is not set');
+}
+if (config.VOYAGE_API_KEY) {
+  logger.info({ model: config.VOYAGE_MODEL }, 'memory embeddings enabled');
+} else {
+  logger.warn('memory embeddings are off: VOYAGE_API_KEY is not set; searching by words only');
 }
 if (config.AUTH_DEV_LOGIN) logger.warn('development sign-in is enabled (local only)');
 

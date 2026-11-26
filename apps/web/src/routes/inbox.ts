@@ -1,4 +1,9 @@
-import { withTenant, type InboundMessage, type MessageDecision } from '@aiw/db';
+import {
+  withTenant,
+  type InboundMessage,
+  type MessageDecision,
+  type OutboundMessage,
+} from '@aiw/db';
 import { EngineError, listInbox, processMessage, recordInbound } from '@aiw/engine';
 import type { Logger } from '@aiw/logger';
 import { getEmployee } from '@aiw/workforce';
@@ -67,13 +72,30 @@ function decisionDto(d: MessageDecision | null) {
   };
 }
 
+function replyDto(r: OutboundMessage) {
+  return {
+    id: r.id,
+    kind: r.kind,
+    body: r.body,
+    status: r.status,
+    answered: r.answered,
+    sources: r.sources,
+    model: r.model,
+    latency_ms: r.latency_ms,
+    input_tokens: r.input_tokens,
+    output_tokens: r.output_tokens,
+    error_code: r.error_code,
+    created_at: new Date(r.created_at).toISOString(),
+  };
+}
+
 /**
  * An AI employee's inbox (Phase 2, slice 3): every message it received and what it decided.
  * Message text is private, so only admins and security admins can read it for now.
  */
 export function registerInboxRoutes(app: FastifyInstance, deps: AuthDeps): void {
   const { db } = deps;
-  const engine = deps.engine ?? { llm: null, allowTestMessages: false };
+  const engine = deps.engine ?? { llm: null, embedder: null, allowTestMessages: false };
 
   async function requireInboxReader(request: FastifyRequest) {
     const session = await requireMember(request, db);
@@ -101,9 +123,11 @@ export function registerInboxRoutes(app: FastifyInstance, deps: AuthDeps): void 
       entries: page.entries.map((e) => ({
         message: messageDto(e.message),
         decision: decisionDto(e.decision),
+        replies: e.replies.map(replyDto),
       })),
       next_cursor: page.nextCursor,
       classifier: engine.llm ? { model: engine.llm.model } : null,
+      embeddings: engine.embedder ? { model: engine.embedder.model } : null,
       test_messages: engine.allowTestMessages,
     };
   });
@@ -168,13 +192,19 @@ export function registerInboxRoutes(app: FastifyInstance, deps: AuthDeps): void 
       );
       try {
         const result = await processMessage(
-          { db, llm: engine.llm, logger: request.log as unknown as Logger },
+          {
+            db,
+            llm: engine.llm,
+            embedder: engine.embedder ?? null,
+            logger: request.log as unknown as Logger,
+          },
           ctx.orgId,
           message.id,
         );
         return reply.status(201).send({
           message: messageDto(result.message),
           decision: decisionDto(result.decision),
+          replies: result.replies.map(replyDto),
           corrections: result.corrections,
           employee: { id: employee.id, name: employee.display_name },
         });

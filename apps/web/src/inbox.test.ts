@@ -14,6 +14,15 @@ class FakeLlm implements StructuredLlm {
   readonly requests: StructuredRequest[] = [];
   async generate(request: StructuredRequest) {
     this.requests.push(request);
+    if (request.name === 'chat_reply') {
+      return {
+        text: JSON.stringify({ reply: 'I will check WEB-1.', answered: 'no', used_sources: [] }),
+        model: this.model,
+        inputTokens: 80,
+        outputTokens: 12,
+        latencyMs: 4,
+      };
+    }
     return {
       text: JSON.stringify({
         intent: 'question',
@@ -107,7 +116,8 @@ describe.skipIf(!url)('inbox API', () => {
       needs: ['jira'],
       model: 'fake-model',
     });
-    expect(llm.requests).toHaveLength(1);
+    expect(llm.requests.map((r) => r.name)).toEqual(['classification', 'chat_reply']);
+    expect(res.json().replies.map((r: { kind: string }) => r.kind)).toEqual(['ack', 'reply']);
 
     const inbox = (await call(admin, 'GET', `/v1/employees/${employeeId}/inbox`)).json();
     expect(inbox.classifier).toEqual({ model: 'fake-model' });
@@ -117,6 +127,11 @@ describe.skipIf(!url)('inbox API', () => {
       status: 'decided',
     });
     expect(inbox.entries[0].decision.facts.direct_message).toBe(true);
+    expect(inbox.entries[0].replies[1]).toMatchObject({
+      body: 'I will check WEB-1.',
+      status: 'draft',
+      answered: 'no',
+    });
   });
 
   it('validates test messages', async () => {

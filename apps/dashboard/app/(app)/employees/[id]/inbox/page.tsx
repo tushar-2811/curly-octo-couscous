@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/states';
 import { apiFetch, getMe } from '@/lib/api';
 import { ApiError } from '@/lib/api-error';
-import { getInbox, type InboxEntry, type InboxPage } from '@/lib/inbox';
+import { getInbox, type InboxEntry, type InboxPage, type InboxReply } from '@/lib/inbox';
 import { listPeople } from '@/lib/structure';
 import type { EmployeeDetail, MemberRow } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
@@ -81,8 +81,11 @@ export default async function InboxPage({
         <p className="mt-1 text-sm text-gray-600">
           Messages it received and what it decided to do with each.{' '}
           {page.classifier
-            ? `Classified by ${page.classifier.model}.`
-            : 'No language model is set up yet.'}
+            ? `Classified and answered by ${page.classifier.model}.`
+            : 'No language model is set up yet.'}{' '}
+          {page.embeddings
+            ? `Memory searched by meaning (${page.embeddings.model}) and by words.`
+            : 'Memory searched by words only (no VOYAGE_API_KEY).'}
         </p>
       </div>
 
@@ -112,7 +115,7 @@ export default async function InboxPage({
           <section aria-label="Messages">
             <ul className="divide-y divide-gray-300 border-y border-gray-300">
               {page.entries.map((entry) => (
-                <Entry key={entry.message.id} entry={entry} />
+                <Entry key={entry.message.id} entry={entry} employeeName={employee.display_name} />
               ))}
             </ul>
             <nav className="mt-4 flex justify-between text-sm" aria-label="Pages">
@@ -142,7 +145,7 @@ export default async function InboxPage({
   );
 }
 
-function Entry({ entry }: { entry: InboxEntry }) {
+function Entry({ entry, employeeName }: { entry: InboxEntry; employeeName: string }) {
   const { message: m, decision: d } = entry;
   const c = d?.classification ?? null;
   const failed = m.status === 'failed' || d?.action === 'needs_review' || d?.error_code;
@@ -206,6 +209,14 @@ function Entry({ entry }: { entry: InboxEntry }) {
         </p>
       )}
 
+      {entry.replies.length > 0 && (
+        <div className="mt-3 space-y-2 border-l-2 border-black pl-3">
+          {entry.replies.map((r) => (
+            <Reply key={r.id} reply={r} name={employeeName} />
+          ))}
+        </div>
+      )}
+
       {d && (
         <details className="mt-2">
           <summary className="cursor-pointer text-xs text-gray-600 hover:text-black">Why</summary>
@@ -266,6 +277,54 @@ function Entry({ entry }: { entry: InboxEntry }) {
         </details>
       )}
     </li>
+  );
+}
+
+const REPLY_STATUS: Record<InboxReply['status'], string> = {
+  draft: 'Draft, not sent (test message)',
+  queued: 'Waiting to send',
+  sent: 'Sent',
+  failed: 'Failed',
+};
+
+const ANSWERED: Record<'yes' | 'partly' | 'no', string> = {
+  yes: 'Answered from memory',
+  partly: 'Partly answered',
+  no: 'Could not answer yet',
+};
+
+function Reply({ reply: r, name }: { reply: InboxReply; name: string }) {
+  const failed = r.status === 'failed';
+  return (
+    <div>
+      <p className="text-xs text-gray-600">
+        <span className="font-medium text-black">{name}</span>
+        {r.kind === 'ack' ? ' · first note' : ''} · {REPLY_STATUS[r.status]}
+        {r.answered ? ` · ${ANSWERED[r.answered]}` : ''}
+        {r.latency_ms !== null ? ` · ${(r.latency_ms / 1000).toFixed(1)} s` : ''}
+      </p>
+      {failed ? (
+        <p role="alert" className="mt-0.5 text-sm font-semibold text-red-600">
+          Error: {r.error_code ? (ERROR_LABELS[r.error_code] ?? r.error_code) : r.body}
+        </p>
+      ) : (
+        <p className="mt-0.5 whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{r.body}</p>
+      )}
+      {r.sources.length > 0 && (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-xs text-gray-600 hover:text-black">
+            Based on {r.sources.length} {r.sources.length === 1 ? 'memory' : 'memories'}
+          </summary>
+          <ul className="mt-1 space-y-1 rounded-md bg-gray-100 p-2 text-xs">
+            {r.sources.map((s) => (
+              <li key={s.memory_id} className="[overflow-wrap:anywhere]">
+                {s.snippet}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 

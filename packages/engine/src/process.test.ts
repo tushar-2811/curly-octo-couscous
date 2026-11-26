@@ -19,9 +19,13 @@ class FakeLlm implements StructuredLlm {
   readonly model = 'fake-model';
   readonly requests: StructuredRequest[] = [];
   next: unknown[] = [];
+  replies: unknown[] = [];
   async generate(request: StructuredRequest) {
     this.requests.push(request);
-    const out = this.next.shift();
+    const out =
+      request.name === 'chat_reply'
+        ? (this.replies.shift() ?? { reply: 'Not sure yet.', answered: 'no', used_sources: [] })
+        : this.next.shift();
     if (out instanceof Error) throw out;
     return {
       text: typeof out === 'string' ? out : JSON.stringify(out),
@@ -142,11 +146,43 @@ describe.skipIf(!url)('processing messages', () => {
       error_code: null,
     });
     expect(result.message.status).toBe('decided');
-    expect(llm.requests.at(-1)?.input).toContain('<message>\nNova, what is the status of WEB-12?');
+    expect(llm.requests[0]?.input).toContain('<message>\nNova, what is the status of WEB-12?');
+    // Jira is needed, so a "looking into it" note goes first, then the drafted reply.
+    expect(result.replies.map((r) => [r.kind, r.status])).toEqual([
+      ['ack', 'draft'],
+      ['reply', 'draft'],
+    ]);
+    expect(llm.requests[1]?.input).toContain('cannot look these up: Jira');
+    expect(result.memory?.kind).toBe('message');
 
     const again = await processMessage({ db, llm, logger: silent }, ctx.orgId, message.id);
     expect(again.alreadyDecided).toBe(true);
-    expect(llm.requests).toHaveLength(1);
+    expect(again.replies).toHaveLength(2);
+    expect(llm.requests).toHaveLength(2);
+  });
+
+  it('answers from memory the asker could see, citing only real sources', async () => {
+    const earlier = await receive({ body: 'Heads up: the checkout redesign ships on 4 December' });
+    llm.next.push(
+      answer({ intent: 'fyi', addressed_to_me: 'not_addressed', should_respond: false, needs: [] }),
+    );
+    await processMessage({ db, llm, logger: silent }, ctx.orgId, earlier.message.id);
+
+    const { message } = await receive({ body: 'Nova, when does the checkout redesign ship?' });
+    llm.next.push(answer({ needs: ['memory'] }));
+    llm.replies.push({
+      reply: 'Mia said it ships on 4 December.',
+      answered: 'yes',
+      used_sources: [1, 9],
+    });
+    const result = await processMessage({ db, llm, logger: silent }, ctx.orgId, message.id);
+    const prompt = llm.requests.at(-1)!.input;
+    expect(prompt).toContain('[1] (message');
+    expect(prompt).toContain('checkout redesign ships on 4 December');
+    expect(prompt).not.toContain('when does the checkout redesign ship?\n</sources>');
+    expect(result.replies).toHaveLength(1);
+    expect(result.replies[0]).toMatchObject({ kind: 'reply', answered: 'yes', status: 'draft' });
+    expect(result.replies[0]!.sources).toHaveLength(1);
   });
 
   it('keeps messages for others as memory without replying', async () => {

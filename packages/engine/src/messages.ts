@@ -1,4 +1,11 @@
-import type { InboundMessage, MessageDecision, MessageSource, SpaceType, Tx } from '@aiw/db';
+import type {
+  InboundMessage,
+  MessageDecision,
+  MessageSource,
+  OutboundMessage,
+  SpaceType,
+  Tx,
+} from '@aiw/db';
 
 export interface InboundInput {
   orgId: string;
@@ -65,7 +72,29 @@ export async function recordInbound(
     .onConflict((oc) => oc.columns(['employee_id', 'source', 'external_id']).doNothing())
     .returningAll()
     .executeTakeFirst();
-  if (inserted) return { message: inserted, duplicate: false };
+  if (inserted) {
+    // Who is in which space decides what a reply there may use (memory.ts).
+    if (
+      inserted.sender_member_id &&
+      (inserted.space_type === 'space' || inserted.space_type === 'group')
+    ) {
+      await trx
+        .insertInto('knowledge.space_members')
+        .values({
+          org_id: input.orgId,
+          employee_id: input.employeeId,
+          space_name: inserted.space_name ?? `thread:${inserted.thread_key}`,
+          member_id: inserted.sender_member_id,
+        })
+        .onConflict((oc) =>
+          oc
+            .columns(['employee_id', 'space_name', 'member_id'])
+            .doUpdateSet({ last_seen_at: new Date() }),
+        )
+        .execute();
+    }
+    return { message: inserted, duplicate: false };
+  }
   const existing = await trx
     .selectFrom('conversations.inbound_messages')
     .selectAll()
@@ -79,6 +108,7 @@ export async function recordInbound(
 export interface InboxEntry {
   message: InboundMessage;
   decision: MessageDecision | null;
+  replies: OutboundMessage[];
 }
 
 /** Newest first, keyset paging on the id, each with its latest decision. */
@@ -110,9 +140,26 @@ export async function listInbox(
           )
           .orderBy('id', 'asc')
           .execute();
+  const replies =
+    page.length === 0
+      ? []
+      : await trx
+          .selectFrom('conversations.outbound_messages')
+          .selectAll()
+          .where(
+            'in_reply_to',
+            'in',
+            page.map((m) => m.id),
+          )
+          .orderBy('id', 'asc')
+          .execute();
   const latest = new Map(decisions.map((d) => [d.message_id, d] as const));
   return {
-    entries: page.map((message) => ({ message, decision: latest.get(message.id) ?? null })),
+    entries: page.map((message) => ({
+      message,
+      decision: latest.get(message.id) ?? null,
+      replies: replies.filter((r) => r.in_reply_to === message.id),
+    })),
     nextCursor: rows.length > options.limit ? (page.at(-1)?.id ?? null) : null,
   };
 }

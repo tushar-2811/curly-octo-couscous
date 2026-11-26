@@ -48,15 +48,32 @@ export interface InboxDecision {
   created_at: string;
 }
 
+export interface InboxReply {
+  id: string;
+  kind: 'reply' | 'ack';
+  body: string;
+  status: 'draft' | 'queued' | 'sent' | 'failed';
+  answered: 'yes' | 'partly' | 'no' | null;
+  sources: { memory_id: string; snippet: string }[];
+  model: string | null;
+  latency_ms: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  error_code: string | null;
+  created_at: string;
+}
+
 export interface InboxEntry {
   message: InboxMessage;
   decision: InboxDecision | null;
+  replies: InboxReply[];
 }
 
 export interface InboxPage {
   entries: InboxEntry[];
   next_cursor: string | null;
   classifier: { model: string } | null;
+  embeddings: { model: string } | null;
   test_messages: boolean;
 }
 

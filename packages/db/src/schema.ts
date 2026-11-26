@@ -247,6 +247,68 @@ export interface MessageDecisionsTable {
   created_at: Timestamp;
 }
 
+export type MemoryKind =
+  | 'message'
+  | 'decision'
+  | 'action_item'
+  | 'requirement'
+  | 'technical_fact'
+  | 'person_fact'
+  | 'summary';
+export type MemoryScope = 'direct' | 'space' | 'org';
+
+/** Something an AI employee knows, tied to its source and to who could see the source. */
+export interface MemoryItemsTable {
+  id: Generated<string>;
+  org_id: string;
+  employee_id: string;
+  kind: MemoryKind;
+  content: string;
+  source_type: 'inbound_message' | 'outbound_message';
+  source_id: string;
+  scope: MemoryScope;
+  space_name: string | null;
+  audience: ColumnType<string[], string[] | undefined, string[]>;
+  author_member_id: string | null;
+  occurred_at: Timestamp;
+  /** pgvector text form, "[0.1,0.2,…]". Null until embedded. */
+  embedding: string | null;
+  embedding_model: string | null;
+  confidence: Generated<number>;
+  status: Generated<'active' | 'superseded' | 'deleted'>;
+  created_at: Timestamp;
+}
+
+export interface SpaceMembersTable {
+  org_id: string;
+  employee_id: string;
+  space_name: string;
+  member_id: string;
+  last_seen_at: Timestamp;
+}
+
+export type OutboundStatus = 'draft' | 'queued' | 'sent' | 'failed';
+
+/** A reply or "looking into it" note from an AI employee. */
+export interface OutboundMessagesTable {
+  id: Generated<string>;
+  org_id: string;
+  employee_id: string;
+  in_reply_to: string;
+  kind: 'reply' | 'ack';
+  body: string;
+  status: Generated<OutboundStatus>;
+  answered: 'yes' | 'partly' | 'no' | null;
+  sources: Json<{ memory_id: string; snippet: string }[]>;
+  model: string | null;
+  latency_ms: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  error_code: string | null;
+  created_at: Timestamp;
+  sent_at: Timestamp | null;
+}
+
 export interface Database {
   'workforce.organizations': OrganizationsTable;
   'workforce.members': MembersTable;
@@ -258,6 +320,9 @@ export interface Database {
   'platform.secrets': SecretsTable;
   'conversations.inbound_messages': InboundMessagesTable;
   'conversations.message_decisions': MessageDecisionsTable;
+  'conversations.outbound_messages': OutboundMessagesTable;
+  'knowledge.memory_items': MemoryItemsTable;
+  'knowledge.space_members': SpaceMembersTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }
@@ -275,3 +340,5 @@ export type ExternalIdentity = Selectable<ExternalIdentitiesTable>;
 export type OauthLinkRequest = Selectable<OauthLinkRequestsTable>;
 export type InboundMessage = Selectable<InboundMessagesTable>;
 export type MessageDecision = Selectable<MessageDecisionsTable>;
+export type MemoryItem = Selectable<MemoryItemsTable>;
+export type OutboundMessage = Selectable<OutboundMessagesTable>;
