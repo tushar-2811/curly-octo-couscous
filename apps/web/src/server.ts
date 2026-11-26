@@ -1,5 +1,6 @@
 import { createDb, pingDb } from '@aiw/db';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
+import { OpenAiLlm } from '@aiw/engine';
 import { SecretBox } from '@aiw/platform';
 import { buildApp } from './app';
 import { loadWebConfig } from './config';
@@ -59,6 +60,17 @@ const app = await buildApp({
           },
         }
       : {}),
+    engine: {
+      llm: config.OPENAI_API_KEY
+        ? new OpenAiLlm({
+            apiKey: config.OPENAI_API_KEY,
+            model: config.OPENAI_MODEL,
+            timeoutMs: config.LLM_TIMEOUT_MS,
+          })
+        : null,
+      // Typed test messages are for trying the classifier before Chat and Gmail intake.
+      allowTestMessages: config.APP_ENV === 'local' || config.APP_ENV === 'dev',
+    },
     onboarding: new TemporalOnboardingSignals(
       {
         address: config.TEMPORAL_ADDRESS,
@@ -76,6 +88,11 @@ if (config.GOOGLE_CLIENT_ID) {
   );
 } else {
   logger.warn('google account linking is off: GOOGLE_CLIENT_ID is not set');
+}
+if (config.OPENAI_API_KEY) {
+  logger.info({ model: config.OPENAI_MODEL }, 'message classifier enabled');
+} else {
+  logger.warn('message classifier is off: OPENAI_API_KEY is not set');
 }
 if (config.AUTH_DEV_LOGIN) logger.warn('development sign-in is enabled (local only)');
 

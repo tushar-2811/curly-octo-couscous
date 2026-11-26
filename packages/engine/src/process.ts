@@ -1,0 +1,291 @@
+import {
+  withTenant,
+  type Database,
+  type InboundMessage,
+  type Kysely,
+  type MessageDecision,
+} from '@aiw/db';
+import type { Logger } from '@aiw/logger';
+import { recordChange } from '@aiw/platform';
+import { PROMPT_VERSION, type Classification } from './classification';
+import { classifyMessage } from './classifier';
+import { decide, DEFAULT_POLICY, type Decision, type DecisionPolicy } from './decide';
+import { computeFacts, type AddressingFacts } from './facts';
+import { LlmError, type LlmErrorCode, type StructuredLlm, type StructuredResult } from './llm';
+
+export interface EngineDeps {
+  db: Kysely<Database>;
+  /** Null when no model is configured: messages are stored and decided without one. */
+  llm: StructuredLlm | null;
+  logger: Logger;
+  policy?: DecisionPolicy;
+}
+
+export interface ProcessResult {
+  message: InboundMessage;
+  decision: MessageDecision;
+  facts: AddressingFacts;
+  classification: Classification | null;
+  corrections: string[];
+  /** True when the message had already been decided and nothing ran again. */
+  alreadyDecided: boolean;
+}
+
+export class EngineError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'not_ai_employee',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'EngineError';
+  }
+}
+
+const THREAD_CONTEXT = 6;
+const THREAD_SNIPPET = 400;
+
+/**
+ * Decide what an AI employee does with one received message: work out the addressing
+ * facts, classify, apply the rules and save the decision. Safe to call again: a decided
+ * message returns its decision; a failed one is tried again.
+ */
+export async function processMessage(
+  deps: EngineDeps,
+  orgId: string,
+  messageId: string,
+): Promise<ProcessResult> {
+  const log = deps.logger.child({ message_id: messageId, org_id: orgId });
+  const started = performance.now();
+
+  const loaded = await withTenant(deps.db, orgId, async (trx) => {
+    const message = await trx
+      .selectFrom('conversations.inbound_messages')
+      .selectAll()
+      .where('id', '=', messageId)
+      .executeTakeFirst();
+    if (!message) throw new EngineError('not_found', 'Message not found');
+    if (message.status === 'decided') {
+      const decision = await trx
+        .selectFrom('conversations.message_decisions')
+        .selectAll()
+        .where('message_id', '=', messageId)
+        .orderBy('id', 'desc')
+        .executeTakeFirstOrThrow();
+      return { done: true as const, message, decision };
+    }
+    const employee = await trx
+      .selectFrom('workforce.members as m')
+      .innerJoin('workforce.ai_profiles as p', 'p.member_id', 'm.id')
+      .select(['m.id', 'm.display_name', 'm.email', 'm.title', 'p.role_key'])
+      .where('m.id', '=', message.employee_id)
+      .where('m.type', '=', 'ai')
+      .executeTakeFirst();
+    if (!employee) throw new EngineError('not_ai_employee', 'The recipient is not an AI employee');
+    const [org, identities, thread] = await Promise.all([
+      trx
+        .selectFrom('workforce.organizations')
+        .select('domain')
+        .where('id', '=', orgId)
+        .executeTakeFirstOrThrow(),
+      trx
+        .selectFrom('workforce.external_identities')
+        .select(['email_address', 'provider_user_id'])
+        .where('member_id', '=', employee.id)
+        .where('connection_status', 'in', ['connected', 'reauth_required'])
+        .execute(),
+      message.thread_key
+        ? trx
+            .selectFrom('conversations.inbound_messages')
+            .select(['sender_name', 'sender_email', 'sender_member_id', 'body'])
+            .where('employee_id', '=', employee.id)
+            .where('thread_key', '=', message.thread_key)
+            .where('id', '<', message.id)
+            .orderBy('id', 'desc')
+            .limit(THREAD_CONTEXT)
+            .execute()
+        : Promise.resolve([]),
+    ]);
+    await trx
+      .updateTable('conversations.inbound_messages')
+      .set({ status: 'processing' })
+      .where('id', '=', messageId)
+      .execute();
+    return { done: false as const, message, employee, org, identities, thread: thread.reverse() };
+  });
+
+  if (loaded.done) {
+    log.info({ action: loaded.decision.action }, 'message already decided');
+    return {
+      message: loaded.message,
+      decision: loaded.decision,
+      facts: loaded.decision.facts as unknown as AddressingFacts,
+      classification: loaded.decision.classification as Classification | null,
+      corrections: [],
+      alreadyDecided: true,
+    };
+  }
+
+  const { message, employee, org, identities, thread } = loaded;
+  const emails = [employee.email, ...identities.map((i) => i.email_address)].filter(
+    (e): e is string => Boolean(e),
+  );
+  const facts = computeFacts(
+    {
+      source: message.source,
+      spaceType: message.space_type,
+      senderEmail: message.sender_email,
+      body: message.body,
+      subject: message.subject,
+      mentions: message.mentions,
+      to: message.to_addresses,
+      cc: message.cc_addresses,
+    },
+    {
+      memberId: employee.id,
+      displayName: employee.display_name,
+      emails,
+      // Google Chat ids arrive with Chat intake (slice 2).
+      chatUserIds: [],
+    },
+    {
+      orgDomain: org.domain,
+      senderIsMember: message.sender_member_id !== null,
+      inMyThread: thread.some((t) => t.sender_member_id === employee.id),
+    },
+  );
+
+  // Skip the model when the rules already decide without it.
+  const skipModel = facts.from_self || (!facts.sender_is_member && !facts.sender_in_domain);
+  let classification: Classification | null = null;
+  let corrections: string[] = [];
+  let call: StructuredResult | null = null;
+  let errorCode: LlmErrorCode | null = null;
+  let retryable = false;
+  if (!skipModel && !deps.llm) {
+    errorCode = 'not_configured';
+    log.warn('no language model configured; deciding without a classification');
+  } else if (!skipModel && deps.llm) {
+    try {
+      const result = await classifyMessage(deps.llm, {
+        employee: { name: employee.display_name, role: employee.title ?? employee.role_key },
+        message: {
+          source: message.source,
+          spaceType: message.space_type,
+          senderName: message.sender_name ?? message.sender_email,
+          subject: message.subject,
+          body: message.body,
+        },
+        facts,
+        thread: thread.map((t) => ({
+          sender:
+            t.sender_member_id === employee.id
+              ? employee.display_name
+              : (t.sender_name ?? t.sender_email ?? 'someone'),
+          text: t.body.length > THREAD_SNIPPET ? `${t.body.slice(0, THREAD_SNIPPET)}…` : t.body,
+        })),
+      });
+      ({ classification, corrections, call } = result);
+      if (corrections.length > 0) log.info({ corrections }, 'classification corrected by facts');
+    } catch (err) {
+      if (!(err instanceof LlmError)) {
+        await markFailed(deps, orgId, messageId, err);
+        throw err;
+      }
+      errorCode = err.code;
+      retryable = err.retryable;
+      log.error({ err, code: err.code, retryable: err.retryable }, 'classification failed');
+    }
+  }
+
+  const decision: Decision = decide(facts, classification, deps.policy ?? DEFAULT_POLICY);
+
+  const saved = await withTenant(deps.db, orgId, async (trx) => {
+    const row = await trx
+      .insertInto('conversations.message_decisions')
+      .values({
+        org_id: orgId,
+        message_id: messageId,
+        facts: JSON.stringify(facts),
+        classification: classification ? JSON.stringify(classification) : null,
+        action: decision.action,
+        reasons: [...decision.reasons, ...corrections.map((c) => `Corrected: ${c}`)],
+        needs: decision.needs,
+        model: call?.model ?? (skipModel ? null : (deps.llm?.model ?? null)),
+        prompt_version: skipModel ? null : PROMPT_VERSION,
+        latency_ms: call?.latencyMs ?? null,
+        input_tokens: call?.inputTokens ?? null,
+        output_tokens: call?.outputTokens ?? null,
+        error_code: errorCode,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const updated = await trx
+      .updateTable('conversations.inbound_messages')
+      .set({
+        // A temporary model failure leaves the message to be tried again.
+        status: retryable ? 'failed' : 'decided',
+        last_error: errorCode ? `Classification failed: ${errorCode}` : null,
+      })
+      .where('id', '=', messageId)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    if (decision.action === 'decline') {
+      await recordChange(
+        trx,
+        { orgId, actorMemberId: null, requestId: null },
+        {
+          action: 'message.declined',
+          resourceType: 'member',
+          resourceId: employee.id,
+          details: { message_id: messageId, source: message.source, reason: decision.reasons[0] },
+        },
+      );
+    }
+    return { row, updated };
+  });
+
+  log.info(
+    {
+      employee_id: employee.id,
+      source: message.source,
+      action: decision.action,
+      intent: classification?.intent ?? null,
+      addressed: classification?.addressed_to_me ?? null,
+      confidence: classification?.confidence ?? null,
+      needs: decision.needs,
+      model: call?.model ?? null,
+      model_ms: call?.latencyMs ?? null,
+      input_tokens: call?.inputTokens ?? null,
+      output_tokens: call?.outputTokens ?? null,
+      error_code: errorCode,
+      duration_ms: Math.round(performance.now() - started),
+    },
+    'message decided',
+  );
+
+  return {
+    message: saved.updated,
+    decision: saved.row,
+    facts,
+    classification,
+    corrections,
+    alreadyDecided: false,
+  };
+}
+
+async function markFailed(deps: EngineDeps, orgId: string, messageId: string, err: unknown) {
+  try {
+    await withTenant(deps.db, orgId, (trx) =>
+      trx
+        .updateTable('conversations.inbound_messages')
+        .set({
+          status: 'failed',
+          last_error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
+        })
+        .where('id', '=', messageId)
+        .execute(),
+    );
+  } catch (markErr) {
+    deps.logger.error({ err: markErr, message_id: messageId }, 'could not mark message failed');
+  }
+}

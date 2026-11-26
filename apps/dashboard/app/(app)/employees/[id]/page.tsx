@@ -75,12 +75,20 @@ export default async function EmployeePage({
           <h1 className="text-2xl font-semibold tracking-tight">{employee.display_name}</h1>
           <EmployeeState state={employee.status} />
           {canAudit && (
-            <Link
-              href={`/audit?resource=${employee.id}`}
-              className="ml-auto text-sm text-gray-600 underline underline-offset-4 hover:text-black"
-            >
-              History
-            </Link>
+            <nav className="ml-auto flex gap-4 text-sm" aria-label="Employee records">
+              <Link
+                href={`/employees/${employee.id}/inbox`}
+                className="text-gray-600 underline underline-offset-4 hover:text-black"
+              >
+                Inbox
+              </Link>
+              <Link
+                href={`/audit?resource=${employee.id}`}
+                className="text-gray-600 underline underline-offset-4 hover:text-black"
+              >
+                History
+              </Link>
+            </nav>
           )}
         </div>
         <p className="mt-1 text-sm text-gray-600">

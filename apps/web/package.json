@@ -14,6 +14,7 @@
   "dependencies": {
     "@aiw/config": "workspace:*",
     "@aiw/db": "workspace:*",
+    "@aiw/engine": "workspace:*",
     "@aiw/logger": "workspace:*",
     "@aiw/platform": "workspace:*",
     "@aiw/workforce": "workspace:*",

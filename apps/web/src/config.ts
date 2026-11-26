@@ -12,6 +12,10 @@ export const webEnvSchema = baseEnvSchema
     GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
     /** Encrypts refresh tokens at rest: 32 random bytes, base64. */
     TOKEN_ENCRYPTION_KEY: z.string().trim().optional(),
+    /** Language model for classifying messages (Phase 2). Off until the key is set. */
+    OPENAI_API_KEY: z.string().trim().optional(),
+    OPENAI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
+    LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
     WEB_HOST: z.string().default('0.0.0.0'),
     WEB_PORT: z.coerce.number().int().positive().default(4000),
     /** Requests per minute per IP for the public client-log endpoint. */

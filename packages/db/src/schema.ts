@@ -198,6 +198,55 @@ export interface OutboxEventsTable {
   dead: Generated<boolean>;
 }
 
+export type MessageSource = 'google_chat' | 'gmail' | 'simulated';
+export type SpaceType = 'direct' | 'group' | 'space' | 'email';
+export type MessageStatus = 'received' | 'processing' | 'decided' | 'failed';
+export type DecisionAction =
+  'ignore' | 'remember' | 'reply' | 'acknowledge' | 'decline' | 'needs_review';
+
+/** A Chat message or email an AI employee received (Phase 2). Stored once per provider id. */
+export interface InboundMessagesTable {
+  id: Generated<string>;
+  org_id: string;
+  employee_id: string;
+  source: MessageSource;
+  external_id: string;
+  thread_key: string | null;
+  space_name: string | null;
+  space_type: SpaceType | null;
+  sender_email: string | null;
+  sender_name: string | null;
+  sender_member_id: string | null;
+  subject: string | null;
+  body: string;
+  mentions: ColumnType<string[], string[] | undefined, string[]>;
+  to_addresses: ColumnType<string[], string[] | undefined, string[]>;
+  cc_addresses: ColumnType<string[], string[] | undefined, string[]>;
+  sent_at: Timestamp;
+  received_at: Timestamp;
+  status: Generated<MessageStatus>;
+  last_error: string | null;
+}
+
+/** What the employee decided to do with a message, and why. */
+export interface MessageDecisionsTable {
+  id: Generated<string>;
+  org_id: string;
+  message_id: string;
+  facts: Json<Record<string, unknown>>;
+  classification: Json<Record<string, unknown>> | null;
+  action: DecisionAction;
+  reasons: ColumnType<string[], string[] | undefined, string[]>;
+  needs: ColumnType<string[], string[] | undefined, string[]>;
+  model: string | null;
+  prompt_version: string | null;
+  latency_ms: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  error_code: string | null;
+  created_at: Timestamp;
+}
+
 export interface Database {
   'workforce.organizations': OrganizationsTable;
   'workforce.members': MembersTable;
@@ -207,6 +256,8 @@ export interface Database {
   'workforce.external_identities': ExternalIdentitiesTable;
   'workforce.oauth_link_requests': OauthLinkRequestsTable;
   'platform.secrets': SecretsTable;
+  'conversations.inbound_messages': InboundMessagesTable;
+  'conversations.message_decisions': MessageDecisionsTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }
@@ -222,3 +273,5 @@ export type ReportingLine = Selectable<ReportingLinesTable>;
 export type AiProfile = Selectable<AiProfilesTable>;
 export type ExternalIdentity = Selectable<ExternalIdentitiesTable>;
 export type OauthLinkRequest = Selectable<OauthLinkRequestsTable>;
+export type InboundMessage = Selectable<InboundMessagesTable>;
+export type MessageDecision = Selectable<MessageDecisionsTable>;

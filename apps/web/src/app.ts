@@ -12,6 +12,7 @@ import { registerHealthRoutes, type ReadinessChecks } from './routes/health';
 import { registerOrganizationRoutes } from './routes/organizations';
 import { registerEmployeeRoutes } from './routes/employees';
 import { registerIdentityRoutes } from './routes/identities';
+import { registerInboxRoutes } from './routes/inbox';
 import { registerStructureRoutes } from './routes/structure';
 
 export interface BuildAppOptions {
@@ -70,6 +71,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     registerEmployeeRoutes(app, options.auth);
     registerIdentityRoutes(app, options.auth);
     registerAuditRoutes(app, options.auth);
+    registerInboxRoutes(app, options.auth);
   }
 
   return app;
