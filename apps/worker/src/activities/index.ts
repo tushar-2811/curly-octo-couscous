@@ -1,5 +1,11 @@
 import { withTenant, type Database, type Kysely } from '@aiw/db';
-import { EngineError, processMessage, type Embedder, type StructuredLlm } from '@aiw/engine';
+import {
+  EngineError,
+  processMessage,
+  type Embedder,
+  type JiraReader,
+  type StructuredLlm,
+} from '@aiw/engine';
 import type { Logger } from '@aiw/logger';
 import { ApplicationFailure } from '@temporalio/common';
 import { continueOnboarding } from '@aiw/workforce';
@@ -11,6 +17,7 @@ export interface ActivityDeps {
   /** Message engine models; null when their keys are not set. */
   llm?: StructuredLlm | null;
   embedder?: Embedder | null;
+  jira?: JiraReader | null;
 }
 
 export interface MessageOutcome {
@@ -63,6 +70,7 @@ export function createActivities(deps: ActivityDeps) {
             db: requireDb(),
             llm: deps.llm ?? null,
             embedder: deps.embedder ?? null,
+            jira: deps.jira ?? null,
             logger: deps.logger,
           },
           input.orgId,

@@ -128,6 +128,7 @@ export function registerInboxRoutes(app: FastifyInstance, deps: AuthDeps): void 
       next_cursor: page.nextCursor,
       classifier: engine.llm ? { model: engine.llm.model } : null,
       embeddings: engine.embedder ? { model: engine.embedder.model } : null,
+      jira: engine.jira ? { site: engine.jira.site } : null,
       test_messages: engine.allowTestMessages,
     };
   });
@@ -211,6 +212,7 @@ export function registerInboxRoutes(app: FastifyInstance, deps: AuthDeps): void 
               db,
               llm: engine.llm,
               embedder: engine.embedder ?? null,
+              jira: engine.jira ?? null,
               logger: request.log as unknown as Logger,
             },
             ctx.orgId,

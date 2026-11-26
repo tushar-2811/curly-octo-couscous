@@ -104,6 +104,8 @@ if (config.VOYAGE_API_KEY) {
 } else {
   logger.warn('memory embeddings are off: VOYAGE_API_KEY is not set; searching by words only');
 }
+if (models.jira) logger.info({ site: models.jira.site }, 'jira reading enabled');
+else logger.warn('jira is off: set JIRA_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_ACCESS_TOKEN');
 if (config.AUTH_DEV_LOGIN) logger.warn('development sign-in is enabled (local only)');
 
 let shuttingDown = false;

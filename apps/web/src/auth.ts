@@ -1,4 +1,4 @@
-import type { Embedder, StructuredLlm } from '@aiw/engine';
+import type { Embedder, JiraReader, StructuredLlm } from '@aiw/engine';
 import type { MessageDispatcher } from './messages';
 import { withTenant, type Database, type Kysely, type Member } from '@aiw/db';
 import { addLogContext } from '@aiw/logger';
@@ -26,6 +26,7 @@ export interface AuthDeps {
   engine?: {
     llm: StructuredLlm | null;
     embedder?: Embedder | null;
+    jira?: JiraReader | null;
     /** Processing in the worker. Absent in tests: messages are processed in the request. */
     dispatcher?: MessageDispatcher;
     allowTestMessages: boolean;

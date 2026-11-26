@@ -1,4 +1,4 @@
-import { Inbox as InboxIcon, Lock } from 'lucide-react';
+import { ExternalLink, Inbox as InboxIcon, Lock } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -85,7 +85,8 @@ export default async function InboxPage({
             : 'No language model is set up yet.'}{' '}
           {page.embeddings
             ? `Memory searched by meaning (${page.embeddings.model}) and by words.`
-            : 'Memory searched by words only (no VOYAGE_API_KEY).'}
+            : 'Memory searched by words only (no VOYAGE_API_KEY).'}{' '}
+          {page.jira ? `Reads Jira at ${page.jira.site}.` : 'Jira is not connected.'}
         </p>
       </div>
 
@@ -288,10 +289,21 @@ const REPLY_STATUS: Record<InboxReply['status'], string> = {
 };
 
 const ANSWERED: Record<'yes' | 'partly' | 'no', string> = {
-  yes: 'Answered from memory',
+  yes: 'Answered',
   partly: 'Partly answered',
   no: 'Could not answer yet',
 };
+
+function sourceSummary(sources: InboxReply['sources']): string {
+  const tickets = sources.filter((s) => s.source === 'jira').length;
+  const memories = sources.length - tickets;
+  return [
+    tickets > 0 ? `${tickets} Jira ${tickets === 1 ? 'ticket' : 'tickets'}` : '',
+    memories > 0 ? `${memories} ${memories === 1 ? 'memory' : 'memories'}` : '',
+  ]
+    .filter(Boolean)
+    .join(' and ');
+}
 
 function Reply({ reply: r, name }: { reply: InboxReply; name: string }) {
   const failed = r.status === 'failed';
@@ -313,12 +325,25 @@ function Reply({ reply: r, name }: { reply: InboxReply; name: string }) {
       {r.sources.length > 0 && (
         <details className="mt-1">
           <summary className="cursor-pointer text-xs text-gray-600 hover:text-black">
-            Based on {r.sources.length} {r.sources.length === 1 ? 'memory' : 'memories'}
+            Based on {sourceSummary(r.sources)}
           </summary>
           <ul className="mt-1 space-y-1 rounded-md bg-gray-100 p-2 text-xs">
             {r.sources.map((s) => (
-              <li key={s.memory_id} className="[overflow-wrap:anywhere]">
-                {s.snippet}
+              <li key={s.id ?? s.memory_id ?? s.snippet} className="[overflow-wrap:anywhere]">
+                {s.source === 'jira' && s.url ? (
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-gray-600"
+                  >
+                    {s.label ?? s.id}
+                    <ExternalLink className="size-3" aria-hidden />
+                    <span className="sr-only">(opens Jira)</span>
+                  </a>
+                ) : (
+                  s.snippet
+                )}
               </li>
             ))}
           </ul>

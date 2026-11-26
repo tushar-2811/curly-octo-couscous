@@ -10,9 +10,11 @@ import {
 import type { Logger } from '@aiw/logger';
 import { recordChange } from '@aiw/platform';
 import { PROMPT_VERSION, type Classification } from './classification';
-import { ACK_TEXT, ANSWER_PROMPT_VERSION, draftReply, replyTask } from './answer';
+import { ACK_TEXT, ANSWER_PROMPT_VERSION, draftReply, replyTask, type Evidence } from './answer';
 import { classifyMessage } from './classifier';
 import type { Embedder } from './embeddings';
+import { jiraEvidence } from './jira-evidence';
+import type { JiraReader } from './jira';
 import { embedQuery, readersFor, rememberMessage, searchMemory } from './memory';
 import { decide, DEFAULT_POLICY, type Decision, type DecisionPolicy } from './decide';
 import { computeFacts, type AddressingFacts } from './facts';
@@ -24,6 +26,8 @@ export interface EngineDeps {
   llm: StructuredLlm | null;
   /** Null when no embedding key is set: memory is searched by words only. */
   embedder?: Embedder | null;
+  /** Read-only Jira. Null when not configured: questions that need it say so. */
+  jira?: JiraReader | null;
   logger: Logger;
   policy?: DecisionPolicy;
 }
@@ -286,15 +290,36 @@ export async function processMessage(
     const outStatus: 'draft' | 'queued' = message.source === 'simulated' ? 'draft' : 'queued';
     const base = { org_id: orgId, employee_id: employee.id, in_reply_to: messageId };
     const readers = readersFor(saved.updated);
-    const evidence = await withTenant(deps.db, orgId, (trx) =>
-      searchMemory(trx, {
-        employeeId: employee.id,
-        readers,
+    const [memoryHits, jira] = await Promise.all([
+      withTenant(deps.db, orgId, (trx) =>
+        searchMemory(trx, {
+          employeeId: employee.id,
+          readers,
+          text: queryText,
+          vector,
+          excludeSourceIds: [messageId],
+        }),
+      ),
+      jiraEvidence(deps.jira ?? null, {
+        needed: decision.needs.includes('jira'),
+        keys: classification?.references.jira_keys ?? [],
         text: queryText,
-        vector,
-        excludeSourceIds: [messageId],
+        summary: classification?.summary ?? null,
+        ignore: employee.display_name.split(/\s+/),
+        logger: log,
       }),
-    );
+    ]);
+    // Tickets first: they are the current state; memory is what people said.
+    const evidence: Evidence[] = [
+      ...jira.items,
+      ...memoryHits.map((h) => ({
+        id: h.id,
+        source: 'memory' as const,
+        kind: h.kind,
+        content: h.content,
+        occurred_at: h.occurred_at,
+      })),
+    ];
     const task = replyTask(decision, classification);
     let row: Parameters<typeof insertReplies>[2][number];
     try {
@@ -315,7 +340,10 @@ export async function processMessage(
         })),
         task,
         evidence,
-        unavailable: decision.needs.filter((n) => n !== 'memory'),
+        unavailable: decision.needs.filter(
+          (n) => n !== 'memory' && !(n === 'jira' && jira.available),
+        ),
+        notes: jira.notes,
       });
       row = {
         ...base,
@@ -324,7 +352,13 @@ export async function processMessage(
         status: outStatus,
         answered: draft.answered,
         sources: JSON.stringify(
-          draft.used.map((u) => ({ memory_id: u.id, snippet: u.content.slice(0, 300) })),
+          draft.used.map((u) => ({
+            source: u.source,
+            id: u.id,
+            ...(u.label ? { label: u.label } : {}),
+            ...(u.url ? { url: u.url } : {}),
+            snippet: u.content.slice(0, 300),
+          })),
         ),
         model: draft.call.model,
         latency_ms: draft.call.latencyMs,
@@ -337,6 +371,7 @@ export async function processMessage(
           task,
           answered: draft.answered,
           evidence: evidence.length,
+          jira_tickets: jira.items.length,
           used: draft.used.length,
           model_ms: draft.call.latencyMs,
           input_tokens: draft.call.inputTokens,

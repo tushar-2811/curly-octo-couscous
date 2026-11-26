@@ -185,6 +185,52 @@ describe.skipIf(!url)('processing messages', () => {
     expect(result.replies[0]!.sources).toHaveLength(1);
   });
 
+  it('answers ticket questions from Jira', async () => {
+    const jira = {
+      site: 'example.atlassian.net',
+      allows: (k: string) => k.startsWith('WEB-'),
+      getIssue: async (key: string) => ({
+        key,
+        url: `https://example.atlassian.net/browse/${key}`,
+        type: 'Task',
+        summary: 'Payments review',
+        status: 'In Review',
+        statusCategory: 'In Progress',
+        assignee: 'Mia',
+        reporter: 'Raj',
+        priority: 'High',
+        created: null,
+        updated: '2026-11-25T10:00:00.000+0000',
+        due: null,
+        labels: [],
+        parent: null,
+        sprint: null,
+        description: '',
+        comments: [],
+      }),
+      searchText: async () => [],
+    };
+    const { message } = await receive({ mentions: [`nova@${domain}`] });
+    llm.next.push(answer());
+    llm.replies.push({
+      reply: 'WEB-12 is in review with Mia.',
+      answered: 'yes',
+      used_sources: [1],
+    });
+    const result = await processMessage({ db, llm, jira, logger: silent }, ctx.orgId, message.id);
+    const prompt = llm.requests.at(-1)!.input;
+    expect(prompt).toContain('[1] (Jira ticket WEB-12, 2026-11-25) WEB-12 (Task): Payments review');
+    expect(prompt).not.toContain('cannot look these up');
+    const reply = result.replies.find((r) => r.kind === 'reply')!;
+    expect(reply.sources).toEqual([
+      expect.objectContaining({
+        source: 'jira',
+        id: 'WEB-12',
+        url: 'https://example.atlassian.net/browse/WEB-12',
+      }),
+    ]);
+  });
+
   it('keeps messages for others as memory without replying', async () => {
     const { message } = await receive({ body: 'Mia, lunch at 1?' });
     llm.next.push(

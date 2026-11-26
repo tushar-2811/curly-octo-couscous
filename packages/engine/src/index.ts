@@ -46,6 +46,7 @@ export {
   draftReply,
   replyTask,
   type AnswerInput,
+  type Evidence,
   type ReplyTask,
 } from './answer';
 export {
@@ -66,3 +67,13 @@ export {
   type MemoryHit,
   type Readers,
 } from './memory';
+export {
+  adfToText,
+  issueEvidenceText,
+  JIRA_KEY,
+  JiraCloudClient,
+  JiraError,
+  type JiraIssue,
+  type JiraReader,
+} from './jira';
+export { jiraEvidence } from './jira-evidence';

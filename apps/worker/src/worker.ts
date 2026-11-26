@@ -77,6 +77,8 @@ if (models.llm) logger.info({ model: models.llm.model }, 'message classifier ena
 else logger.warn('message classifier is off: OPENAI_API_KEY is not set');
 if (models.embedder) logger.info({ model: models.embedder.model }, 'memory embeddings enabled');
 else logger.warn('memory embeddings are off: VOYAGE_API_KEY is not set');
+if (models.jira) logger.info({ site: models.jira.site }, 'jira reading enabled');
+else logger.warn('jira is off: set JIRA_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_ACCESS_TOKEN');
 
 const connection = await connect();
 const worker = await Worker.create({

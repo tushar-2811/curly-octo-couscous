@@ -34,6 +34,16 @@ export const aiEnvSchema = z.object({
   /** Embeddings for memory search. Without it, memory is searched by words only. */
   VOYAGE_API_KEY: z.string().trim().optional(),
   VOYAGE_MODEL: z.string().trim().min(1).default('voyage-4'),
+  /** Read-only Jira Cloud. On when the URL, email and API token are all set. */
+  JIRA_BASE_URL: z.url().optional(),
+  ATLASSIAN_EMAIL: z.email().optional(),
+  ATLASSIAN_ACCESS_TOKEN: z.string().trim().optional(),
+  /** Comma-separated project keys the employees may read, e.g. "PF". Empty: all. */
+  JIRA_PROJECTS: z
+    .string()
+    .trim()
+    .regex(/^([A-Z][A-Z0-9_]*)?(,\s*[A-Z][A-Z0-9_]*)*$/, 'Use project keys like PF,WEB')
+    .optional(),
 });
 
 export class ConfigError extends Error {

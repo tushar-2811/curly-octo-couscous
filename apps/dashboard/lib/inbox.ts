@@ -54,7 +54,15 @@ export interface InboxReply {
   body: string;
   status: 'draft' | 'queued' | 'sent' | 'failed';
   answered: 'yes' | 'partly' | 'no' | null;
-  sources: { memory_id: string; snippet: string }[];
+  /** Older drafts only have memory_id. */
+  sources: {
+    source?: 'memory' | 'jira';
+    id?: string;
+    memory_id?: string;
+    label?: string;
+    url?: string;
+    snippet: string;
+  }[];
   model: string | null;
   latency_ms: number | null;
   input_tokens: number | null;
@@ -74,6 +82,7 @@ export interface InboxPage {
   next_cursor: string | null;
   classifier: { model: string } | null;
   embeddings: { model: string } | null;
+  jira: { site: string } | null;
   test_messages: boolean;
 }
 
