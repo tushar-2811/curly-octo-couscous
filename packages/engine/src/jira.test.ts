@@ -128,6 +128,20 @@ describe('finding tickets for a reply', () => {
     expect(out.notes).toEqual([]);
   });
 
+  it('takes the ticket from earlier in the conversation when the message names none', async () => {
+    const jira = new FakeJira();
+    const out = await run(jira, {
+      text: 'tell me what needs to be done in this ticket',
+      context: ['PF-2 is Open and assigned to Mia.', 'who is working on PF-1?'],
+    });
+    expect(out.items.map((i) => i.id)).toEqual(['PF-2']);
+    expect(out.notes[0]).toMatch(/PF-2 was mentioned just before/);
+    expect(jira.searched).toEqual([]);
+    // A key in the message itself wins.
+    const named = await run(jira, { text: 'and PF-1?', context: ['PF-2'] });
+    expect(named.items.map((i) => i.id)).toEqual(['PF-1']);
+  });
+
   it('says when a ticket is missing or in a project it may not read', async () => {
     const out = await run(new FakeJira(), { text: 'PF-404 and SEC-1' });
     expect(out.items).toEqual([]);

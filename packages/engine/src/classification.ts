@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { AddressingFacts } from './facts';
 
 /** Bump when the prompt or schema changes, so decisions can be compared by version. */
-export const PROMPT_VERSION = 'classify-v1';
+export const PROMPT_VERSION = 'classify-v2';
 
 export const INTENTS = [
   'question',
@@ -105,7 +105,7 @@ addressed_to_me:
 should_respond: true only if a reply from the employee is expected. People talking to each other in a shared space do not need the employee's reply.
 urgency: now (blocking someone, or asked to do it now), later, none.
 needs: the sources an answer needs. memory = past conversations and team knowledge; jira = tickets or ticket comments; code = repository contents; people_directory = who does what in the company. Empty when no lookup is needed.
-references: Jira keys (like ABC-123), repository names, people's names and URLs that appear in the message. Empty lists when none.
+references: Jira keys (like ABC-123), repository names, people's names and URLs that appear in the message. When the message points back to something earlier ("this ticket", "it", "that PR"), take it from the thread. Empty lists when none.
 confidence: how sure you are of intent and addressing together. Use below 0.6 when guessing.`;
 
 export interface ClassifierInput {
@@ -136,8 +136,8 @@ export function classifierPrompt(input: ClassifierInput): string {
     `Channel: ${input.message.source}${input.message.spaceType ? `, ${input.message.spaceType}` : ''}`,
     `Facts worked out by code (trust these): ${JSON.stringify(input.facts)}`,
     thread
-      ? `Earlier in the thread:\n<thread>\n${thread}\n</thread>`
-      : 'Earlier in the thread: none',
+      ? `Earlier in this conversation (oldest first):\n<thread>\n${thread}\n</thread>`
+      : 'Earlier in this conversation: nothing recent',
     `From: ${input.message.senderName ?? 'unknown'}`,
     input.message.subject ? `Subject: ${input.message.subject}` : '',
     `<message>\n${body}\n</message>`,

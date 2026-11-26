@@ -231,6 +231,53 @@ describe.skipIf(!url)('processing messages', () => {
     ]);
   });
 
+  it('understands follow-ups from the conversation, including its own replies', async () => {
+    const asked: string[] = [];
+    const jira = {
+      site: 'example.atlassian.net',
+      allows: () => true,
+      getIssue: async (key: string) => {
+        asked.push(key);
+        return null;
+      },
+      searchText: async () => [],
+    };
+    const space = { spaceName: 'spaces/follow-up', spaceType: 'space' as const };
+    const first = await receive({
+      ...space,
+      body: 'who is working on PF-7614?',
+      mentions: [`nova@${domain}`],
+    });
+    llm.next.push(
+      answer({ references: { jira_keys: ['PF-7614'], repos: [], people: [], urls: [] } }),
+    );
+    llm.replies.push({
+      reply: 'PF-7614 is assigned to Chirag.',
+      answered: 'yes',
+      used_sources: [],
+    });
+    await processMessage({ db, llm, jira, logger: silent }, ctx.orgId, first.message.id);
+
+    const next = await receive({ ...space, body: 'tell me what needs to be done in this ticket' });
+    llm.next.push(
+      answer({
+        addressed_to_me: 'implicit',
+        references: { jira_keys: [], repos: [], people: [], urls: [] },
+      }),
+    );
+    const result = await processMessage(
+      { db, llm, jira, logger: silent },
+      ctx.orgId,
+      next.message.id,
+    );
+    expect(result.facts.in_my_thread).toBe(true);
+    const classifierPrompt = llm.requests.at(-2)!.input;
+    expect(classifierPrompt).toContain('Mia: who is working on PF-7614?');
+    expect(classifierPrompt).toContain('Nova: PF-7614 is assigned to Chirag.');
+    expect(asked.at(-1)).toBe('PF-7614');
+    expect(llm.requests.at(-1)!.input).toContain('PF-7614 was mentioned just before');
+  });
+
   it('keeps messages for others as memory without replying', async () => {
     const { message } = await receive({ body: 'Mia, lunch at 1?' });
     llm.next.push(

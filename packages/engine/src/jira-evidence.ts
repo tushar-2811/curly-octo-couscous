@@ -59,19 +59,45 @@ export async function jiraEvidence(
     summary: string | null;
     /** Words to leave out of a search, such as the employee's name. */
     ignore?: string[];
+    /** Earlier messages in the conversation, newest first: "this ticket" means one of these. */
+    context?: string[];
     logger: Logger;
   },
 ): Promise<JiraEvidence> {
-  const keys = [
+  const named = [
     ...new Set([...(input.text.toUpperCase().match(KEY_IN_TEXT) ?? []), ...input.keys]),
   ].filter((k) => JIRA_KEY.test(k));
+  // No key in the message: the most recent ticket mentioned earlier in the conversation.
+  let fromContext: string[] = [];
+  if (named.length === 0) {
+    for (const line of input.context ?? []) {
+      const found = [...new Set(line.toUpperCase().match(KEY_IN_TEXT) ?? [])].filter((k) =>
+        JIRA_KEY.test(k),
+      );
+      if (found.length > 0) {
+        fromContext = found.slice(0, 2);
+        break;
+      }
+    }
+  }
+  const keys = named.length > 0 ? named : fromContext;
   if (!jira) {
     return { items: [], notes: [], available: false };
   }
   if (keys.length === 0 && !input.needed) return { items: [], notes: [], available: true };
+  if (fromContext.length > 0 && !input.needed) return { items: [], notes: [], available: true };
 
   const started = performance.now();
   const notes: string[] = [];
+  if (fromContext.length > 0) {
+    notes.push(
+      `The message names no ticket; ${fromContext.join(' and ')} ${
+        fromContext.length === 1 ? 'was' : 'were'
+      } mentioned just before in the conversation, so it most likely means ${
+        fromContext.length === 1 ? 'that one' : 'one of those'
+      }.`,
+    );
+  }
   try {
     let issues: JiraIssue[];
     if (keys.length > 0) {
@@ -101,6 +127,7 @@ export async function jiraEvidence(
     input.logger.info(
       {
         keys,
+        from_context: fromContext.length > 0,
         fetched: issues.map((i) => i.key),
         searched: keys.length === 0 ? searchKeywords(input.text, input.ignore) : false,
         jira_ms: Math.round(performance.now() - started),

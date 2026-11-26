@@ -13,6 +13,7 @@ import { PROMPT_VERSION, type Classification } from './classification';
 import { ACK_TEXT, ANSWER_PROMPT_VERSION, draftReply, replyTask, type Evidence } from './answer';
 import { classifyMessage } from './classifier';
 import type { Embedder } from './embeddings';
+import { loadConversation } from './context';
 import { jiraEvidence } from './jira-evidence';
 import type { JiraReader } from './jira';
 import { embedQuery, readersFor, rememberMessage, searchMemory } from './memory';
@@ -55,9 +56,6 @@ export class EngineError extends Error {
     this.name = 'EngineError';
   }
 }
-
-const THREAD_CONTEXT = 6;
-const THREAD_SNIPPET = 400;
 
 /**
  * Decide what an AI employee does with one received message: work out the addressing
@@ -114,24 +112,14 @@ export async function processMessage(
         .where('member_id', '=', employee.id)
         .where('connection_status', 'in', ['connected', 'reauth_required'])
         .execute(),
-      message.thread_key
-        ? trx
-            .selectFrom('conversations.inbound_messages')
-            .select(['sender_name', 'sender_email', 'sender_member_id', 'body'])
-            .where('employee_id', '=', employee.id)
-            .where('thread_key', '=', message.thread_key)
-            .where('id', '<', message.id)
-            .orderBy('id', 'desc')
-            .limit(THREAD_CONTEXT)
-            .execute()
-        : Promise.resolve([]),
+      loadConversation(trx, message, { id: employee.id, name: employee.display_name }),
     ]);
     await trx
       .updateTable('conversations.inbound_messages')
       .set({ status: 'processing' })
       .where('id', '=', messageId)
       .execute();
-    return { done: false as const, message, employee, org, identities, thread: thread.reverse() };
+    return { done: false as const, message, employee, org, identities, thread };
   });
 
   if (loaded.done) {
@@ -173,7 +161,7 @@ export async function processMessage(
     {
       orgDomain: org.domain,
       senderIsMember: message.sender_member_id !== null,
-      inMyThread: thread.some((t) => t.sender_member_id === employee.id),
+      inMyThread: thread.some((t) => t.fromEmployee),
     },
   );
 
@@ -199,13 +187,7 @@ export async function processMessage(
           body: message.body,
         },
         facts,
-        thread: thread.map((t) => ({
-          sender:
-            t.sender_member_id === employee.id
-              ? employee.display_name
-              : (t.sender_name ?? t.sender_email ?? 'someone'),
-          text: t.body.length > THREAD_SNIPPET ? `${t.body.slice(0, THREAD_SNIPPET)}…` : t.body,
-        })),
+        thread: thread.map((t) => ({ sender: t.sender, text: t.text })),
       });
       ({ classification, corrections, call } = result);
       if (corrections.length > 0) log.info({ corrections }, 'classification corrected by facts');
@@ -306,6 +288,7 @@ export async function processMessage(
         text: queryText,
         summary: classification?.summary ?? null,
         ignore: employee.display_name.split(/\s+/),
+        context: [...thread].reverse().map((t) => t.text),
         logger: log,
       }),
     ]);
@@ -331,13 +314,7 @@ export async function processMessage(
             ? 'direct message to you'
             : (message.space_name ?? 'a shared space'),
         body: queryText,
-        thread: thread.map((t) => ({
-          sender:
-            t.sender_member_id === employee.id
-              ? employee.display_name
-              : (t.sender_name ?? t.sender_email ?? 'someone'),
-          text: t.body.length > THREAD_SNIPPET ? `${t.body.slice(0, THREAD_SNIPPET)}…` : t.body,
-        })),
+        thread: thread.map((t) => ({ sender: t.sender, text: t.text })),
         task,
         evidence,
         unavailable: decision.needs.filter(
