@@ -27,7 +27,16 @@ export {
   type StructuredRequest,
   type StructuredResult,
 } from './llm';
-export { listInbox, MAX_BODY, recordInbound, type InboundInput, type InboxEntry } from './messages';
+export {
+  listInbox,
+  loadProcessed,
+  MAX_BODY,
+  recordInbound,
+  staleMessages,
+  type InboundInput,
+  type InboxEntry,
+} from './messages';
+export { createModels, type ModelSettings } from './models';
 export { EngineError, processMessage, type EngineDeps, type ProcessResult } from './process';
 export {
   ACK_TEXT,

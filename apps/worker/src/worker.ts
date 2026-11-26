@@ -1,11 +1,14 @@
 import { existsSync } from 'node:fs';
 import { createDb } from '@aiw/db';
+import { createModels } from '@aiw/engine';
 import { fileURLToPath } from 'node:url';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
+import { Client, Connection } from '@temporalio/client';
 import { NativeConnection, Runtime, Worker } from '@temporalio/worker';
 import { createActivities } from './activities';
 import { loadWorkerConfig } from './config';
 import { ActivityLoggingInterceptor, createTemporalLogger } from './logging';
+import { sweepMessages } from './sweep';
 
 const config = loadWorkerConfig();
 const logger = createLogger({
@@ -69,18 +72,43 @@ const db = createDb({
   logger,
 });
 
+const models = createModels(config);
+if (models.llm) logger.info({ model: models.llm.model }, 'message classifier enabled');
+else logger.warn('message classifier is off: OPENAI_API_KEY is not set');
+if (models.embedder) logger.info({ model: models.embedder.model }, 'memory embeddings enabled');
+else logger.warn('memory embeddings are off: VOYAGE_API_KEY is not set');
+
 const connection = await connect();
 const worker = await Worker.create({
   connection,
   namespace: config.TEMPORAL_NAMESPACE,
   taskQueue: config.TEMPORAL_TASK_QUEUE,
   ...workflowSource(),
-  activities: createActivities({ logger, db }),
+  activities: createActivities({ logger, db, ...models }),
   interceptors: { activity: [() => ({ inbound: new ActivityLoggingInterceptor(logger) })] },
 });
 
+// The sweep starts workflows, so it needs a client connection as well as the worker's.
+const clientConnection = await Connection.connect({ address: config.TEMPORAL_ADDRESS });
+const client = new Client({ connection: clientConnection, namespace: config.TEMPORAL_NAMESPACE });
+let sweeping = false;
+const sweep = async () => {
+  if (sweeping) return;
+  sweeping = true;
+  try {
+    await sweepMessages({ db, client, taskQueue: config.TEMPORAL_TASK_QUEUE, logger });
+  } catch (err) {
+    logger.error({ err }, 'message sweep failed');
+  } finally {
+    sweeping = false;
+  }
+};
+const sweepTimer = setInterval(() => void sweep(), config.MESSAGE_SWEEP_SECONDS * 1000);
+setTimeout(() => void sweep(), 5000);
+
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
+    clearInterval(sweepTimer);
     logger.info({ signal }, 'shutting down worker; finishing in-flight tasks');
     worker.shutdown();
   });
@@ -97,6 +125,8 @@ try {
   logger.fatal({ err }, 'worker crashed');
   process.exitCode = 1;
 } finally {
+  clearInterval(sweepTimer);
+  await clientConnection.close();
   await connection.close();
   await db.destroy();
   await stopTelemetry();

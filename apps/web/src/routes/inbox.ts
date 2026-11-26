@@ -4,7 +4,7 @@ import {
   type MessageDecision,
   type OutboundMessage,
 } from '@aiw/db';
-import { EngineError, listInbox, processMessage, recordInbound } from '@aiw/engine';
+import { EngineError, listInbox, loadProcessed, processMessage, recordInbound } from '@aiw/engine';
 import type { Logger } from '@aiw/logger';
 import { getEmployee } from '@aiw/workforce';
 import { randomUUID } from 'node:crypto';
@@ -190,30 +190,58 @@ export function registerInboxRoutes(app: FastifyInstance, deps: AuthDeps): void 
         },
         'test message received',
       );
-      try {
-        const result = await processMessage(
-          {
-            db,
-            llm: engine.llm,
-            embedder: engine.embedder ?? null,
-            logger: request.log as unknown as Logger,
-          },
-          ctx.orgId,
-          message.id,
-        );
-        return reply.status(201).send({
-          message: messageDto(result.message),
-          decision: decisionDto(result.decision),
-          replies: result.replies.map(replyDto),
-          corrections: result.corrections,
-          employee: { id: employee.id, name: employee.display_name },
-        });
-      } catch (err) {
-        if (err instanceof EngineError) {
-          throw new AppError(err.code === 'not_found' ? 404 : 422, err.code, err.message);
+      // Normally the worker processes it; without Temporal, this request does.
+      let outcome: 'done' | 'pending' = 'done';
+      let via: 'worker' | 'request' = 'request';
+      if (engine.dispatcher) {
+        try {
+          outcome = await engine.dispatcher.process(ctx.orgId, message.id, 45_000);
+          via = 'worker';
+        } catch (err) {
+          request.log.warn(
+            { err, message_id: message.id },
+            'Temporal unavailable; processing the message in this request',
+          );
         }
-        throw err;
       }
+      if (via === 'request') {
+        try {
+          await processMessage(
+            {
+              db,
+              llm: engine.llm,
+              embedder: engine.embedder ?? null,
+              logger: request.log as unknown as Logger,
+            },
+            ctx.orgId,
+            message.id,
+          );
+        } catch (err) {
+          if (err instanceof EngineError) {
+            throw new AppError(err.code === 'not_found' ? 404 : 422, err.code, err.message);
+          }
+          throw err;
+        }
+      }
+      const processed = await withTenant(db, ctx.orgId, (trx) => loadProcessed(trx, message.id));
+      if (!processed) throw new AppError(404, 'not_found', 'Message not found');
+      request.log.info(
+        {
+          message_id: message.id,
+          processed_by: via,
+          pending: outcome === 'pending',
+          action: processed.decision?.action ?? null,
+        },
+        'test message processed',
+      );
+      return reply.status(outcome === 'pending' ? 202 : 201).send({
+        message: messageDto(processed.message),
+        decision: decisionDto(processed.decision),
+        replies: processed.replies.map(replyDto),
+        processed_by: via,
+        pending: outcome === 'pending',
+        employee: { id: employee.id, name: employee.display_name },
+      });
     },
   );
 }

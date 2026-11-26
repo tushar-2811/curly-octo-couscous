@@ -43,7 +43,7 @@ export function TestMessage({
     setSent(null);
     errors.clear();
     try {
-      const result = await clientFetch<{ decision: { action: string } | null }>(
+      const result = await clientFetch<{ decision: { action: string } | null; pending: boolean }>(
         `/v1/employees/${employeeId}/inbox/test`,
         {
           method: 'POST',
@@ -56,7 +56,7 @@ export function TestMessage({
           },
         },
       );
-      setSent(result.decision?.action ?? 'saved');
+      setSent(result.pending ? 'pending' : 'done');
       setBody('');
       router.refresh();
     } catch (err) {
@@ -168,7 +168,9 @@ export function TestMessage({
           )}
           {sent && (
             <p role="status" className="text-sm">
-              Received. The decision is at the top of the list below.
+              {sent === 'pending'
+                ? 'Received. It is still being processed; refresh in a moment to see the decision.'
+                : 'Received. The decision is at the top of the list below.'}
             </p>
           )}
           <Button type="submit" loading={sending} disabled={sending || body.trim() === ''}>

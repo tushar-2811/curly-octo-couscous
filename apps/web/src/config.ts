@@ -1,8 +1,16 @@
-import { baseEnvSchema, databaseEnvSchema, loadConfig, temporalEnvSchema, z } from '@aiw/config';
+import {
+  aiEnvSchema,
+  baseEnvSchema,
+  databaseEnvSchema,
+  loadConfig,
+  temporalEnvSchema,
+  z,
+} from '@aiw/config';
 
 export const webEnvSchema = baseEnvSchema
   .extend(databaseEnvSchema.shape)
   .extend(temporalEnvSchema.shape)
+  .extend(aiEnvSchema.shape)
   .extend({
     TEMPORAL_TASK_QUEUE: z.string().default('wf'),
     /** Where people open the dashboard. Google redirects back to it after sign-in. */
@@ -12,13 +20,6 @@ export const webEnvSchema = baseEnvSchema
     GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
     /** Encrypts refresh tokens at rest: 32 random bytes, base64. */
     TOKEN_ENCRYPTION_KEY: z.string().trim().optional(),
-    /** Language model for classifying messages (Phase 2). Off until the key is set. */
-    OPENAI_API_KEY: z.string().trim().optional(),
-    OPENAI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
-    /** Embeddings for memory search. Without it, memory is searched by words only. */
-    VOYAGE_API_KEY: z.string().trim().optional(),
-    VOYAGE_MODEL: z.string().trim().min(1).default('voyage-4'),
-    LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
     WEB_HOST: z.string().default('0.0.0.0'),
     WEB_PORT: z.coerce.number().int().positive().default(4000),
     /** Requests per minute per IP for the public client-log endpoint. */

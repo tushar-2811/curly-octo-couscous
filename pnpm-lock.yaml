@@ -152,6 +152,9 @@ importers:
       '@aiw/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@aiw/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@aiw/logger':
         specifier: workspace:*
         version: link:../../packages/logger

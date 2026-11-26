@@ -1,4 +1,5 @@
 import type { Embedder, StructuredLlm } from '@aiw/engine';
+import type { MessageDispatcher } from './messages';
 import { withTenant, type Database, type Kysely, type Member } from '@aiw/db';
 import { addLogContext } from '@aiw/logger';
 import type { ActorContext, SecretBox } from '@aiw/platform';
@@ -22,7 +23,13 @@ export interface AuthDeps {
   google?: { oauth: GoogleOAuth; secrets: SecretBox };
   onboarding?: OnboardingSignals;
   /** Message handling (Phase 2). `llm` is null until OPENAI_API_KEY is set. */
-  engine?: { llm: StructuredLlm | null; embedder?: Embedder | null; allowTestMessages: boolean };
+  engine?: {
+    llm: StructuredLlm | null;
+    embedder?: Embedder | null;
+    /** Processing in the worker. Absent in tests: messages are processed in the request. */
+    dispatcher?: MessageDispatcher;
+    allowTestMessages: boolean;
+  };
 }
 
 /**

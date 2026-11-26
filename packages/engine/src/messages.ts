@@ -1,10 +1,14 @@
-import type {
-  InboundMessage,
-  MessageDecision,
-  MessageSource,
-  OutboundMessage,
-  SpaceType,
-  Tx,
+import {
+  asApp,
+  sql,
+  type Database,
+  type InboundMessage,
+  type Kysely,
+  type MessageDecision,
+  type MessageSource,
+  type OutboundMessage,
+  type SpaceType,
+  type Tx,
 } from '@aiw/db';
 
 export interface InboundInput {
@@ -162,4 +166,42 @@ export async function listInbox(
     })),
     nextCursor: rows.length > options.limit ? (page.at(-1)?.id ?? null) : null,
   };
+}
+
+/** A message with its latest decision and its replies. */
+export async function loadProcessed(trx: Tx, messageId: string): Promise<InboxEntry | null> {
+  const message = await trx
+    .selectFrom('conversations.inbound_messages')
+    .selectAll()
+    .where('id', '=', messageId)
+    .executeTakeFirst();
+  if (!message) return null;
+  const [decision, replies] = await Promise.all([
+    trx
+      .selectFrom('conversations.message_decisions')
+      .selectAll()
+      .where('message_id', '=', messageId)
+      .orderBy('id', 'desc')
+      .executeTakeFirst(),
+    trx
+      .selectFrom('conversations.outbound_messages')
+      .selectAll()
+      .where('in_reply_to', '=', messageId)
+      .orderBy('id')
+      .execute(),
+  ]);
+  return { message, decision: decision ?? null, replies };
+}
+
+/** Messages to (re)process across all organizations: see migration 0012. */
+export async function staleMessages(
+  db: Kysely<Database>,
+  max: number,
+): Promise<{ org_id: string; message_id: string }[]> {
+  return asApp(db, async (trx) => {
+    const result = await sql<{ org_id: string; message_id: string }>`
+      select org_id, message_id from app.stale_inbound_messages(${max})
+    `.execute(trx);
+    return result.rows;
+  });
 }

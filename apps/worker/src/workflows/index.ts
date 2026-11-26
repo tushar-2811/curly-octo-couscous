@@ -24,3 +24,4 @@ export {
   onboardingWorkflow,
   type OnboardingInput,
 } from './onboarding';
+export { messageWorkflow, type MessageInput, type MessageResult } from './message';

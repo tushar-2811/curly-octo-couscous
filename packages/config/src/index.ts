@@ -25,6 +25,17 @@ export const temporalEnvSchema = z.object({
   TEMPORAL_NAMESPACE: z.string().default('default'),
 });
 
+/** Models for the message engine (Phase 2). Each is off until its key is set. */
+export const aiEnvSchema = z.object({
+  /** Classifies messages and drafts replies. */
+  OPENAI_API_KEY: z.string().trim().optional(),
+  OPENAI_MODEL: z.string().trim().min(1).default('gpt-6-luna'),
+  LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
+  /** Embeddings for memory search. Without it, memory is searched by words only. */
+  VOYAGE_API_KEY: z.string().trim().optional(),
+  VOYAGE_MODEL: z.string().trim().min(1).default('voyage-4'),
+});
+
 export class ConfigError extends Error {
   constructor(
     message: string,

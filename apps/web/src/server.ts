@@ -1,10 +1,11 @@
 import { createDb, pingDb } from '@aiw/db';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
-import { OpenAiLlm, VoyageEmbedder } from '@aiw/engine';
+import { createModels } from '@aiw/engine';
 import { SecretBox } from '@aiw/platform';
 import { buildApp } from './app';
 import { loadWebConfig } from './config';
 import { HttpGoogleOAuth } from './google-oauth';
+import { TemporalMessageDispatcher } from './messages';
 import { TemporalOnboardingSignals } from './onboarding';
 import { SessionCodec } from './session';
 
@@ -37,6 +38,8 @@ const db = createDb({
   logger,
 });
 
+const models = createModels(config);
+
 const app = await buildApp({
   logger,
   meta: { service: 'web', version: config.SERVICE_VERSION, env: config.APP_ENV },
@@ -61,16 +64,15 @@ const app = await buildApp({
         }
       : {}),
     engine: {
-      llm: config.OPENAI_API_KEY
-        ? new OpenAiLlm({
-            apiKey: config.OPENAI_API_KEY,
-            model: config.OPENAI_MODEL,
-            timeoutMs: config.LLM_TIMEOUT_MS,
-          })
-        : null,
-      embedder: config.VOYAGE_API_KEY
-        ? new VoyageEmbedder({ apiKey: config.VOYAGE_API_KEY, model: config.VOYAGE_MODEL })
-        : null,
+      ...models,
+      dispatcher: new TemporalMessageDispatcher(
+        {
+          address: config.TEMPORAL_ADDRESS,
+          namespace: config.TEMPORAL_NAMESPACE,
+          taskQueue: config.TEMPORAL_TASK_QUEUE,
+        },
+        logger,
+      ),
       // Typed test messages are for trying the classifier before Chat and Gmail intake.
       allowTestMessages: config.APP_ENV === 'local' || config.APP_ENV === 'dev',
     },
