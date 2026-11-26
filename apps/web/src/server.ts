@@ -1,7 +1,10 @@
 import { createDb, pingDb } from '@aiw/db';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
+import { SecretBox } from '@aiw/platform';
 import { buildApp } from './app';
 import { loadWebConfig } from './config';
+import { HttpGoogleOAuth } from './google-oauth';
+import { TemporalOnboardingSignals } from './onboarding';
 import { SessionCodec } from './session';
 
 const config = loadWebConfig();
@@ -44,8 +47,36 @@ const app = await buildApp({
     // Local dev runs over http; everywhere else cookies are HTTPS-only.
     secureCookies: config.APP_ENV !== 'local',
     devLogin: config.AUTH_DEV_LOGIN,
+    ...(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET && config.TOKEN_ENCRYPTION_KEY
+      ? {
+          google: {
+            oauth: new HttpGoogleOAuth(
+              config.GOOGLE_CLIENT_ID,
+              config.GOOGLE_CLIENT_SECRET,
+              `${config.DASHBOARD_URL}/api/v1/oauth/google/callback`,
+            ),
+            secrets: new SecretBox(config.TOKEN_ENCRYPTION_KEY),
+          },
+        }
+      : {}),
+    onboarding: new TemporalOnboardingSignals(
+      {
+        address: config.TEMPORAL_ADDRESS,
+        namespace: config.TEMPORAL_NAMESPACE,
+        taskQueue: config.TEMPORAL_TASK_QUEUE,
+      },
+      logger,
+    ),
   },
 });
+if (config.GOOGLE_CLIENT_ID) {
+  logger.info(
+    { redirect_uri: `${config.DASHBOARD_URL}/api/v1/oauth/google/callback` },
+    'google account linking enabled',
+  );
+} else {
+  logger.warn('google account linking is off: GOOGLE_CLIENT_ID is not set');
+}
 if (config.AUTH_DEV_LOGIN) logger.warn('development sign-in is enabled (local only)');
 
 let shuttingDown = false;

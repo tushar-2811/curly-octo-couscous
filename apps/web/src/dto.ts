@@ -1,4 +1,4 @@
-import type { Member, OrgUnit, Organization } from '@aiw/db';
+import type { ExternalIdentity, Member, OrgUnit, Organization } from '@aiw/db';
 import type { EmployeeRow, MemberRow, OrgUnitWithCounts, RoleTemplate } from '@aiw/workforce';
 
 /** API representations. Internal columns (auth_subject, settings) never leave the server. */
@@ -82,5 +82,21 @@ export function employeeDto(row: EmployeeRow) {
     max_open_tasks: row.max_open_tasks,
     suspension_reason: row.suspension_reason,
     last_error: row.last_error,
+  };
+}
+
+/** A linked account. The credential reference and tokens never leave the server. */
+export function identityDto(i: ExternalIdentity) {
+  return {
+    id: i.id,
+    provider: i.provider,
+    email: i.email_address,
+    hosted_domain: i.hosted_domain,
+    authentication_status: i.authentication_status,
+    connection_status: i.connection_status,
+    granted_scopes: i.granted_scopes,
+    connected_at: toIso(i.connected_at),
+    last_verified_at: i.last_verified_at ? toIso(i.last_verified_at) : null,
+    disconnected_at: i.disconnected_at ? toIso(i.disconnected_at) : null,
   };
 }

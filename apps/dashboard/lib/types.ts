@@ -123,8 +123,27 @@ export interface OnboardingCheck {
   detail: string;
 }
 
+export type ConnectionStatus =
+  'pending' | 'connected' | 'reauth_required' | 'revoked' | 'disconnected';
+
+/** A linked account, e.g. the employee's company Google account. */
+export interface ExternalIdentity {
+  id: string;
+  provider: 'google_workspace';
+  email: string;
+  hosted_domain: string | null;
+  authentication_status: 'unverified' | 'verified' | 'failed';
+  connection_status: ConnectionStatus;
+  granted_scopes: string[];
+  connected_at: string;
+  last_verified_at: string | null;
+  disconnected_at: string | null;
+}
+
 export interface EmployeeDetail {
   employee: Employee;
   template: RoleTemplate | null;
   onboarding: { state: AiState; onboarding: boolean; checks: OnboardingCheck[] };
+  identities: ExternalIdentity[];
+  google_configured: boolean;
 }

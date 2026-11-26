@@ -10,6 +10,7 @@ import { registerClientLogRoutes } from './routes/client-logs';
 import { registerHealthRoutes, type ReadinessChecks } from './routes/health';
 import { registerOrganizationRoutes } from './routes/organizations';
 import { registerEmployeeRoutes } from './routes/employees';
+import { registerIdentityRoutes } from './routes/identities';
 import { registerStructureRoutes } from './routes/structure';
 
 export interface BuildAppOptions {
@@ -66,6 +67,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     registerOrganizationRoutes(app, options.auth);
     registerStructureRoutes(app, options.auth);
     registerEmployeeRoutes(app, options.auth);
+    registerIdentityRoutes(app, options.auth);
   }
 
   return app;

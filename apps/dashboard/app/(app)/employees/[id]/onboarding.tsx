@@ -108,8 +108,8 @@ export function Onboarding({
             ))}
           </ul>
           <p className="mt-2 text-xs text-gray-600">
-            Google sign-in linking and tool connections are set up in the next updates. Until then
-            those items stay pending.
+            Tool connections (Jira, Git, Figma) are set up in the next updates. Until then those
+            items stay pending.
           </p>
         </section>
       </CardContent>

@@ -1,8 +1,17 @@
-import { baseEnvSchema, databaseEnvSchema, loadConfig, z } from '@aiw/config';
+import { baseEnvSchema, databaseEnvSchema, loadConfig, temporalEnvSchema, z } from '@aiw/config';
 
 export const webEnvSchema = baseEnvSchema
   .extend(databaseEnvSchema.shape)
+  .extend(temporalEnvSchema.shape)
   .extend({
+    TEMPORAL_TASK_QUEUE: z.string().default('wf'),
+    /** Where people open the dashboard. Google redirects back to it after sign-in. */
+    DASHBOARD_URL: z.url().default('http://localhost:3000'),
+    /** OAuth client from Google Cloud (Web application). Linking is off until both are set. */
+    GOOGLE_CLIENT_ID: z.string().trim().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
+    /** Encrypts refresh tokens at rest: 32 random bytes, base64. */
+    TOKEN_ENCRYPTION_KEY: z.string().trim().optional(),
     WEB_HOST: z.string().default('0.0.0.0'),
     WEB_PORT: z.coerce.number().int().positive().default(4000),
     /** Requests per minute per IP for the public client-log endpoint. */
@@ -14,6 +23,28 @@ export const webEnvSchema = baseEnvSchema
     AUTH_DEV_LOGIN: z.stringbool().default(false),
   })
   .superRefine((env, ctx) => {
+    const google = Boolean(env.GOOGLE_CLIENT_ID) || Boolean(env.GOOGLE_CLIENT_SECRET);
+    if (google && !env.GOOGLE_CLIENT_ID) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GOOGLE_CLIENT_ID'],
+        message: 'Set it with GOOGLE_CLIENT_SECRET',
+      });
+    }
+    if (google && !env.GOOGLE_CLIENT_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GOOGLE_CLIENT_SECRET'],
+        message: 'Set it with GOOGLE_CLIENT_ID',
+      });
+    }
+    if (google && Buffer.from(env.TOKEN_ENCRYPTION_KEY ?? '', 'base64').length !== 32) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TOKEN_ENCRYPTION_KEY'],
+        message: 'Needed with Google sign-in: 32 random bytes, base64 (openssl rand -base64 32)',
+      });
+    }
     if (env.AUTH_DEV_LOGIN && env.APP_ENV !== 'local') {
       ctx.addIssue({
         code: 'custom',

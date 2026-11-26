@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { createDb } from '@aiw/db';
 import { fileURLToPath } from 'node:url';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
 import { NativeConnection, Runtime, Worker } from '@temporalio/worker';
@@ -28,10 +29,20 @@ Runtime.install({
   logger: createTemporalLogger(logger, config.LOG_LEVEL === 'debug' ? 'DEBUG' : 'INFO'),
 });
 
-/** In production the workflows are pre-bundled at build time; in dev Temporal bundles the source. */
+/**
+ * In production the workflows are pre-bundled at build time. Everywhere else Temporal
+ * bundles the source, so a bundle left over from `pnpm build` can never hide new or
+ * changed workflows in development.
+ */
 function workflowSource(): { workflowBundle: { codePath: string } } | { workflowsPath: string } {
   const bundlePath = fileURLToPath(new URL('../workflow-bundle.js', import.meta.url));
-  if (existsSync(bundlePath)) return { workflowBundle: { codePath: bundlePath } };
+  if (config.NODE_ENV === 'production') {
+    if (!existsSync(bundlePath)) {
+      logger.fatal({ bundle_path: bundlePath }, 'workflow bundle missing; run the worker build');
+      process.exit(1);
+    }
+    return { workflowBundle: { codePath: bundlePath } };
+  }
   return { workflowsPath: fileURLToPath(new URL('./workflows/index.ts', import.meta.url)) };
 }
 
@@ -52,13 +63,19 @@ async function connect(): Promise<NativeConnection> {
   }
 }
 
+const db = createDb({
+  connectionString: config.DATABASE_URL,
+  poolMax: config.DATABASE_POOL_MAX,
+  logger,
+});
+
 const connection = await connect();
 const worker = await Worker.create({
   connection,
   namespace: config.TEMPORAL_NAMESPACE,
   taskQueue: config.TEMPORAL_TASK_QUEUE,
   ...workflowSource(),
-  activities: createActivities({ logger }),
+  activities: createActivities({ logger, db }),
   interceptors: { activity: [() => ({ inbound: new ActivityLoggingInterceptor(logger) })] },
 });
 
@@ -81,5 +98,6 @@ try {
   process.exitCode = 1;
 } finally {
   await connection.close();
+  await db.destroy();
   await stopTelemetry();
 }

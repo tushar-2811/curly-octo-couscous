@@ -53,3 +53,23 @@ export {
   type IntegrationKey,
   type RoleTemplate,
 } from './role-templates';
+export {
+  checkLinkedIdentity,
+  checkLinkRequester,
+  consumeLinkRequest,
+  continueOnboarding,
+  createLinkRequest,
+  disconnectIdentity,
+  GOOGLE_PROVIDER,
+  IDENTITY_SCOPES,
+  IdentityLinkError,
+  LINK_ERROR_MESSAGES,
+  LINK_REQUEST_TTL_MS,
+  listIdentities,
+  missingScopes,
+  recordLinkFailure,
+  saveLinkedIdentity,
+  type LinkErrorCode,
+  type LinkRequestInput,
+  type VerifiedGoogleIdentity,
+} from './identities';

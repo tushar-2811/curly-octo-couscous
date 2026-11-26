@@ -22,6 +22,12 @@ export function genRequestId(req: IncomingMessage): string {
  * - one "request completed" line per request with method, route, status and duration
  *   (warn for 4xx, error for 5xx; health probes only at debug to keep logs readable)
  */
+/** OAuth codes and state must never reach the logs. */
+const SECRET_PARAMS = /([?&](?:code|state|token|id_token|access_token)=)[^&]*/g;
+export function redactUrl(url: string): string {
+  return url.replace(SECRET_PARAMS, '$1[redacted]');
+}
+
 export function registerRequestContext(app: FastifyInstance): void {
   app.addHook('onRequest', (request, reply, done) => {
     reply.header('x-request-id', request.id);
@@ -33,7 +39,7 @@ export function registerRequestContext(app: FastifyInstance): void {
     const fields = {
       method: request.method,
       route,
-      url: request.url,
+      url: redactUrl(request.url),
       status: reply.statusCode,
       duration_ms: Math.round(reply.elapsedTime),
     };

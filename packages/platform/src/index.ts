@@ -101,3 +101,4 @@ export async function recordChange(
   await recordAudit(trx, ctx, audit);
   if (event) await emitEvent(trx, ctx, event);
 }
+export { deleteSecret, readSecret, SecretBox, storeSecret } from './secrets';

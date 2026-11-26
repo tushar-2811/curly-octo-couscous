@@ -17,3 +17,10 @@ export async function pingWorkflow(message: string): Promise<string> {
   log.info('ping workflow completed', { reply });
   return reply;
 }
+
+export {
+  identityDisconnectedSignal,
+  identityLinkedSignal,
+  onboardingWorkflow,
+  type OnboardingInput,
+} from './onboarding';

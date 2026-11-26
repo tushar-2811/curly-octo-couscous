@@ -1,8 +1,10 @@
 import { withTenant, type Database, type Kysely, type Member } from '@aiw/db';
 import { addLogContext } from '@aiw/logger';
-import type { ActorContext } from '@aiw/platform';
+import type { ActorContext, SecretBox } from '@aiw/platform';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from './errors';
+import type { GoogleOAuth } from './google-oauth';
+import type { OnboardingSignals } from './onboarding';
 import { SESSION_COOKIE, type SessionClaims, type SessionCodec } from './session';
 
 declare module 'fastify' {
@@ -15,6 +17,9 @@ export interface AuthDeps {
   db: Kysely<Database>;
   codec: SessionCodec;
   secureCookies: boolean;
+  /** Linking AI employees' Google accounts. Absent until GOOGLE_CLIENT_ID is set. */
+  google?: { oauth: GoogleOAuth; secrets: SecretBox };
+  onboarding?: OnboardingSignals;
 }
 
 /**

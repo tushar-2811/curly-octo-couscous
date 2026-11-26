@@ -1,10 +1,12 @@
 import { Bot, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { FormAlert } from '@/components/form-alert';
 import { LoadError } from '@/components/load-error';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState } from '@/components/ui/states';
 import { getMe } from '@/lib/api';
+import { linkErrorMessage } from '@/lib/link-errors';
 import { listEmployees, listRoleTemplates } from '@/lib/structure';
 import type { Employee, RoleTemplate } from '@/lib/types';
 import { EmployeeState } from './employee-state';
@@ -18,12 +20,22 @@ const HIRE_LINK =
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; link_error?: string; request_id?: string }>;
 }) {
-  const { show } = await searchParams;
+  const { show, link_error: linkError, request_id: requestId } = await searchParams;
   const showEnded = show === 'all';
   const me = await getMe();
   const isAdmin = me.member?.role === 'admin';
+
+  // A Google sign-in that could not be matched to an employee comes back here.
+  const linkAlert = linkError ? (
+    <div className="mb-6">
+      <FormAlert
+        {...linkErrorMessage(linkError.slice(0, 40))}
+        requestId={requestId?.slice(0, 80)}
+      />
+    </div>
+  ) : null;
 
   const header = (
     <PageHeader
@@ -48,6 +60,7 @@ export default async function EmployeesPage({
     return (
       <>
         {header}
+        {linkAlert}
         <LoadError error={err} what="AI employees" />
       </>
     );
@@ -59,6 +72,7 @@ export default async function EmployeesPage({
   return (
     <>
       {header}
+      {linkAlert}
       {visible.length === 0 ? (
         <EmptyState
           icon={Bot}

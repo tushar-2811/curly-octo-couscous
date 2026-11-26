@@ -124,6 +124,9 @@ importers:
       '@fastify/rate-limit':
         specifier: ^11.3.0
         version: 11.3.0
+      '@temporalio/client':
+        specifier: ^1.26.0
+        version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)
       fastify:
         specifier: ^5.12.8
         version: 5.12.8
@@ -143,9 +146,18 @@ importers:
       '@aiw/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@aiw/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@aiw/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@aiw/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@aiw/workforce':
+        specifier: workspace:*
+        version: link:../../packages/workforce
       '@temporalio/activity':
         specifier: ^1.26.0
         version: 1.26.0(long@5.3.2)(protobufjs@8.8.1)

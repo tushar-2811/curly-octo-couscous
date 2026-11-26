@@ -4,6 +4,7 @@ import {
   getEmployee,
   hireEmployee,
   listEmployees,
+  listIdentities,
   onboardingChecklist,
   resumeEmployee,
   ROLE_TEMPLATES,
@@ -15,7 +16,8 @@ import {
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireMember, type AuthDeps } from '../auth';
-import { employeeDto, roleTemplateDto } from '../dto';
+import { employeeDto, identityDto, roleTemplateDto } from '../dto';
+import { disconnectIdentities, revokeQuietly } from './identities';
 
 const AI_STATES = [
   'draft',
@@ -126,12 +128,16 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
   app.get('/v1/employees/:id', async (request) => {
     const { ctx } = await requireMember(request, db);
     const { id } = idParam.parse(request.params);
-    const row = await withTenant(db, ctx.orgId, (trx) => getEmployee(trx, id));
+    const [row, identities] = await withTenant(db, ctx.orgId, (trx) =>
+      Promise.all([getEmployee(trx, id), listIdentities(trx, id)]),
+    );
     const template = findRoleTemplate(row.role_key);
     return {
       employee: employeeDto(row),
       template: template ? roleTemplateDto(template) : null,
       onboarding: onboardingChecklist(row, template),
+      identities: identities.map(identityDto),
+      google_configured: Boolean(deps.google),
     };
   });
 
@@ -176,10 +182,19 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
     app.post(`/v1/employees/:id/${action}`, async (request) => {
       const { member, ctx } = await requireMember(request, db);
       const { id } = idParam.parse(request.params);
-      const row = await withTenant(db, ctx.orgId, async (trx) => {
+      const { row, tokens } = await withTenant(db, ctx.orgId, async (trx) => {
+        const before = await getEmployee(trx, id);
         await run(trx, ctx, member, id);
-        return getEmployee(trx, id);
+        // Termination disconnects its accounts and revokes their tokens at Google.
+        const revoked =
+          action === 'terminate' && before.status !== 'terminated'
+            ? await disconnectIdentities(trx, ctx, deps, id, 'terminated')
+            : [];
+        return { row: await getEmployee(trx, id), tokens: revoked };
       });
+      for (const token of tokens) {
+        await revokeQuietly(deps, request.log, token, { employee_id: id, reason: 'terminated' });
+      }
       request.log.info(
         { employee_id: id, action, state: row.status },
         'ai employee lifecycle action',

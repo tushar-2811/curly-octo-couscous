@@ -8,6 +8,7 @@ import { ApiError } from '@/lib/api-error';
 import { listPeople, listUnits } from '@/lib/structure';
 import type { EmployeeDetail, MemberRow, OrgUnit } from '@/lib/types';
 import { EmployeeState } from '../employee-state';
+import { GoogleAccount, type LinkResult } from './google-account';
 import { Lifecycle } from './lifecycle';
 import { Onboarding } from './onboarding';
 import { Profile } from './profile';
@@ -17,8 +18,26 @@ export const dynamic = 'force-dynamic';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function EmployeePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ link?: string; link_error?: string; request_id?: string }>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
+  // Set by the API's Google callback redirect.
+  const linkResult: LinkResult | null =
+    query.link === 'connected'
+      ? { status: 'connected' }
+      : query.link_error
+        ? {
+            status: 'error',
+            code: query.link_error.slice(0, 40),
+            ...(query.request_id ? { requestId: query.request_id.slice(0, 80) } : {}),
+          }
+        : null;
   if (!UUID.test(id)) notFound();
   const me = await getMe();
   const isAdmin = me.member?.role === 'admin';
@@ -43,7 +62,7 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const { employee, template, onboarding } = detail;
+  const { employee, template, onboarding, identities, google_configured } = detail;
   const terminated = employee.status === 'terminated';
 
   return (
@@ -76,6 +95,13 @@ export default async function EmployeePage({ params }: { params: Promise<{ id: s
             domain={me.organization?.domain ?? ''}
           />
         )}
+        <GoogleAccount
+          employee={employee}
+          identities={identities}
+          googleConfigured={google_configured}
+          isAdmin={isAdmin}
+          result={linkResult}
+        />
         <Profile
           employee={employee}
           template={template}

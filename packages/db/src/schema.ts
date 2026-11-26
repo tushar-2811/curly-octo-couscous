@@ -110,6 +110,61 @@ export interface ReportingLinesTable {
   created_at: Timestamp;
 }
 
+export type IdentityProvider = 'google_workspace';
+export type AuthenticationStatus = 'unverified' | 'verified' | 'failed';
+export type ConnectionStatus =
+  'pending' | 'connected' | 'reauth_required' | 'revoked' | 'disconnected';
+
+/** An account an employee uses, e.g. its company Google account (Identity linking §3). */
+export interface ExternalIdentitiesTable {
+  id: Generated<string>;
+  org_id: string;
+  member_id: string;
+  provider: IdentityProvider;
+  /** Google's stable `sub`, never the email. */
+  provider_user_id: string;
+  email_address: string;
+  hosted_domain: string | null;
+  authentication_status: Generated<AuthenticationStatus>;
+  granted_scopes: ColumnType<string[], string[] | undefined, string[]>;
+  connection_status: Generated<ConnectionStatus>;
+  is_primary: Generated<boolean>;
+  credential_ref: string | null;
+  last_verified_at: Timestamp | null;
+  last_error: string | null;
+  connected_at: Timestamp;
+  disconnected_at: Timestamp | null;
+  created_by: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+/** A pending OAuth sign-in. Single use, expires after 10 minutes. */
+export interface OauthLinkRequestsTable {
+  state_hash: string;
+  org_id: string;
+  member_id: string;
+  provider: IdentityProvider;
+  expected_email: string;
+  nonce_hash: string;
+  /** Encrypted. */
+  pkce_verifier: string;
+  requested_scopes: string[];
+  created_by: string;
+  created_at: Timestamp;
+  expires_at: Timestamp;
+  consumed_at: Timestamp | null;
+}
+
+/** Encrypted secret values such as refresh tokens. Never returned by the API. */
+export interface SecretsTable {
+  id: Generated<string>;
+  org_id: string;
+  purpose: string;
+  ciphertext: string;
+  created_at: Timestamp;
+}
+
 export interface AuditLogsTable {
   id: Generated<string>;
   org_id: string | null;
@@ -151,6 +206,9 @@ export interface Database {
   'workforce.org_units': OrgUnitsTable;
   'workforce.reporting_lines': ReportingLinesTable;
   'workforce.ai_profiles': AiProfilesTable;
+  'workforce.external_identities': ExternalIdentitiesTable;
+  'workforce.oauth_link_requests': OauthLinkRequestsTable;
+  'platform.secrets': SecretsTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }
@@ -164,3 +222,5 @@ export type AuditLog = Selectable<AuditLogsTable>;
 export type OrgUnit = Selectable<OrgUnitsTable>;
 export type ReportingLine = Selectable<ReportingLinesTable>;
 export type AiProfile = Selectable<AiProfilesTable>;
+export type ExternalIdentity = Selectable<ExternalIdentitiesTable>;
+export type OauthLinkRequest = Selectable<OauthLinkRequestsTable>;

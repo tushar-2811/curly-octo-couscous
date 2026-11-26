@@ -50,6 +50,18 @@ if (!/^SESSION_SECRET=.{32,}$/m.test(readFileSync(envPath, 'utf8'))) {
   );
   say('generated SESSION_SECRET in .env');
 }
+// Same for the key that encrypts stored refresh tokens.
+if (!/^TOKEN_ENCRYPTION_KEY=.{40,}$/m.test(readFileSync(envPath, 'utf8'))) {
+  const key = randomBytes(32).toString('base64');
+  const content = readFileSync(envPath, 'utf8');
+  writeFileSync(
+    envPath,
+    /^TOKEN_ENCRYPTION_KEY=.*$/m.test(content)
+      ? content.replace(/^TOKEN_ENCRYPTION_KEY=.*$/m, `TOKEN_ENCRYPTION_KEY=${key}`)
+      : `${content.trimEnd()}\nTOKEN_ENCRYPTION_KEY=${key}\n`,
+  );
+  say('generated TOKEN_ENCRYPTION_KEY in .env');
+}
 for (const line of readFileSync(envPath, 'utf8').split('\n')) {
   const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
   if (match && process.env[match[1]] === undefined) process.env[match[1]] = match[2];

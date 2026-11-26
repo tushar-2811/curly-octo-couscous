@@ -14,7 +14,10 @@
   },
   "dependencies": {
     "@aiw/config": "workspace:*",
+    "@aiw/db": "workspace:*",
     "@aiw/logger": "workspace:*",
+    "@aiw/platform": "workspace:*",
+    "@aiw/workforce": "workspace:*",
     "@temporalio/activity": "^1.26.0",
     "@temporalio/client": "^1.26.0",
     "@temporalio/common": "^1.26.0",

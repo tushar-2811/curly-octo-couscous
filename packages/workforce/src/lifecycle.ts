@@ -10,11 +10,23 @@ import { WorkforceError } from './errors';
 export const AI_TRANSITIONS: Record<AiState, readonly AiState[]> = {
   draft: ['external_identity_pending', 'terminated'],
   external_identity_pending: ['external_identity_pending', 'identity_connected', 'terminated'],
-  identity_connected: ['integrations_pending'],
-  integrations_pending: ['permissions_configured', 'onboarding_failed'],
-  permissions_configured: ['environment_ready', 'onboarding_failed'],
-  environment_ready: ['active', 'onboarding_failed'],
-  onboarding_failed: ['integrations_pending', 'terminated'],
+  // Every onboarding state can go back to external_identity_pending when the account is
+  // disconnected (flow D), and can be terminated.
+  identity_connected: ['integrations_pending', 'external_identity_pending', 'terminated'],
+  integrations_pending: [
+    'permissions_configured',
+    'onboarding_failed',
+    'external_identity_pending',
+    'terminated',
+  ],
+  permissions_configured: [
+    'environment_ready',
+    'onboarding_failed',
+    'external_identity_pending',
+    'terminated',
+  ],
+  environment_ready: ['active', 'onboarding_failed', 'external_identity_pending', 'terminated'],
+  onboarding_failed: ['integrations_pending', 'external_identity_pending', 'terminated'],
   active: ['suspended', 'terminated'],
   suspended: ['active', 'external_identity_pending', 'terminated'],
   terminated: [],
