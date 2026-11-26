@@ -8,7 +8,7 @@ import { NativeConnection, Runtime, Worker } from '@temporalio/worker';
 import { createActivities } from './activities';
 import { loadWorkerConfig } from './config';
 import { ActivityLoggingInterceptor, createTemporalLogger } from './logging';
-import { sweepMessages } from './sweep';
+import { sweepConversations, sweepMessages } from './sweep';
 
 const config = loadWorkerConfig();
 const logger = createLogger({
@@ -99,6 +99,15 @@ const sweep = async () => {
   sweeping = true;
   try {
     await sweepMessages({ db, client, taskQueue: config.TEMPORAL_TASK_QUEUE, logger });
+    if (models.llm) {
+      await sweepConversations({
+        db,
+        client,
+        taskQueue: config.TEMPORAL_TASK_QUEUE,
+        logger,
+        quietSeconds: config.FACT_QUIET_MINUTES * 60,
+      });
+    }
   } catch (err) {
     logger.error({ err }, 'message sweep failed');
   } finally {

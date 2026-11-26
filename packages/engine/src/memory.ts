@@ -116,6 +116,7 @@ export async function rememberMessage(
         occurred_at: message.sent_at,
         embedding: literal,
         embedding_model: model,
+        conversation_key: message.conversation_key,
       })
       .onConflict((oc) =>
         oc

@@ -1,4 +1,11 @@
-import type { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
+import type {
+  ColumnType,
+  Generated,
+  GeneratedAlways,
+  Insertable,
+  Selectable,
+  Updateable,
+} from 'kysely';
 
 /**
  * Kysely table types, keyed "schema.table". Each module owns one Postgres schema
@@ -226,6 +233,8 @@ export interface InboundMessagesTable {
   received_at: Timestamp;
   status: Generated<MessageStatus>;
   last_error: string | null;
+  /** Generated: thread, else space, else the direct chat with the sender. */
+  conversation_key: GeneratedAlways<string>;
 }
 
 /** What the employee decided to do with a message, and why. */
@@ -274,6 +283,7 @@ export interface MemoryItemsTable {
   /** pgvector text form, "[0.1,0.2,…]". Null until embedded. */
   embedding: string | null;
   embedding_model: string | null;
+  conversation_key: string | null;
   confidence: Generated<number>;
   status: Generated<'active' | 'superseded' | 'deleted'>;
   created_at: Timestamp;
@@ -285,6 +295,24 @@ export interface SpaceMembersTable {
   space_name: string;
   member_id: string;
   last_seen_at: Timestamp;
+}
+
+export interface MemorySourcesTable {
+  org_id: string;
+  memory_id: string;
+  message_id: string;
+}
+
+/** How far fact extraction has read a conversation. */
+export interface ConversationDigestsTable {
+  org_id: string;
+  employee_id: string;
+  conversation_key: string;
+  last_message_id: string;
+  runs: Generated<number>;
+  facts_added: Generated<number>;
+  last_run_at: Timestamp;
+  last_error: string | null;
 }
 
 export type OutboundStatus = 'draft' | 'queued' | 'sent' | 'failed';
@@ -323,6 +351,8 @@ export interface Database {
   'conversations.outbound_messages': OutboundMessagesTable;
   'knowledge.memory_items': MemoryItemsTable;
   'knowledge.space_members': SpaceMembersTable;
+  'knowledge.memory_sources': MemorySourcesTable;
+  'knowledge.conversation_digests': ConversationDigestsTable;
   'platform.audit_logs': AuditLogsTable;
   'platform.outbox_events': OutboxEventsTable;
 }

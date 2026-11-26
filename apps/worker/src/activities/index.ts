@@ -1,6 +1,7 @@
 import { withTenant, type Database, type Kysely } from '@aiw/db';
 import {
   EngineError,
+  extractConversationFacts,
   processMessage,
   type Embedder,
   type JiraReader,
@@ -95,6 +96,27 @@ export function createActivities(deps: ActivityDeps) {
         }
         throw err;
       }
+    },
+
+    /**
+     * Pull decisions, action items and other durable facts out of a quiet conversation.
+     * A model failure throws so Temporal retries; the cursor only moves on success.
+     */
+    async extractFacts(input: {
+      orgId: string;
+      employeeId: string;
+      conversationKey: string;
+    }): Promise<{ read: number; added: number; superseded: number }> {
+      if (!deps.llm) {
+        throw ApplicationFailure.nonRetryable('No language model is configured', 'NoModel');
+      }
+      const result = await extractConversationFacts(
+        { db: requireDb(), llm: deps.llm, embedder: deps.embedder ?? null, logger: deps.logger },
+        input.orgId,
+        input.employeeId,
+        input.conversationKey,
+      );
+      return { read: result.read, added: result.added.length, superseded: result.superseded };
     },
   };
 }

@@ -83,6 +83,12 @@ export default async function EmployeePage({
                 Inbox
               </Link>
               <Link
+                href={`/employees/${employee.id}/memory`}
+                className="text-gray-600 underline underline-offset-4 hover:text-black"
+              >
+                Memory
+              </Link>
+              <Link
                 href={`/audit?resource=${employee.id}`}
                 className="text-gray-600 underline underline-offset-4 hover:text-black"
               >

@@ -77,3 +77,14 @@ export {
   type JiraReader,
 } from './jira';
 export { jiraEvidence } from './jira-evidence';
+export {
+  conversationsToDigest,
+  extractConversationFacts,
+  FACT_KINDS,
+  listFacts,
+  pendingConversations,
+  type FactEntry,
+  FACT_PROMPT_VERSION,
+  type ExtractResult,
+  type FactKind,
+} from './facts-extract';

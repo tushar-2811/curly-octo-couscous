@@ -13,6 +13,7 @@ import { registerOrganizationRoutes } from './routes/organizations';
 import { registerEmployeeRoutes } from './routes/employees';
 import { registerIdentityRoutes } from './routes/identities';
 import { registerInboxRoutes } from './routes/inbox';
+import { registerMemoryRoutes } from './routes/memory';
 import { registerStructureRoutes } from './routes/structure';
 
 export interface BuildAppOptions {
@@ -72,6 +73,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     registerIdentityRoutes(app, options.auth);
     registerAuditRoutes(app, options.auth);
     registerInboxRoutes(app, options.auth);
+    registerMemoryRoutes(app, options.auth);
   }
 
   return app;
