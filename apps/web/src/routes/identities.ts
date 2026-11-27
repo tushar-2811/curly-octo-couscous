@@ -130,6 +130,7 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: AuthDeps): vo
       );
     }
     const { oauth, secrets } = deps.google;
+    const scopes = deps.google.scopes ?? IDENTITY_SCOPES;
     const state = random();
     const nonce = random();
     const verifier = random();
@@ -138,14 +139,14 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: AuthDeps): vo
         stateHash: sha256(state),
         nonceHash: sha256(nonce),
         pkceVerifier: secrets.seal(verifier),
-        scopes: IDENTITY_SCOPES,
+        scopes,
       }),
     );
     const authorizationUrl = oauth.authorizationUrl({
       state,
       nonce,
       codeChallenge: sha256(verifier),
-      scopes: IDENTITY_SCOPES,
+      scopes,
       loginHint: started.expectedEmail,
       hostedDomain: started.domain,
     });
@@ -156,7 +157,7 @@ export function registerIdentityRoutes(app: FastifyInstance, deps: AuthDeps): vo
     return {
       authorization_url: authorizationUrl,
       expires_at: started.expiresAt.toISOString(),
-      requested_scopes: IDENTITY_SCOPES,
+      requested_scopes: scopes,
     };
   });
 

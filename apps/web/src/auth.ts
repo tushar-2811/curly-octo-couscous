@@ -20,7 +20,12 @@ export interface AuthDeps {
   codec: SessionCodec;
   secureCookies: boolean;
   /** Linking AI employees' Google accounts. Absent until GOOGLE_CLIENT_ID is set. */
-  google?: { oauth: GoogleOAuth; secrets: SecretBox };
+  google?: {
+    oauth: GoogleOAuth;
+    secrets: SecretBox;
+    /** Asked for at sign-in. Default: identity only. With Chat set up, Chat access too. */
+    scopes?: readonly string[];
+  };
   onboarding?: OnboardingSignals;
   /** Message handling (Phase 2). `llm` is null until OPENAI_API_KEY is set. */
   engine?: {

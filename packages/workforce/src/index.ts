@@ -61,6 +61,7 @@ export {
   createLinkRequest,
   disconnectIdentity,
   GOOGLE_PROVIDER,
+  CHAT_SCOPES,
   IDENTITY_SCOPES,
   IdentityLinkError,
   LINK_ERROR_MESSAGES,

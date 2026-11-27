@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { clientFetch, ClientApiError } from '@/lib/client-api';
 import { linkErrorMessage } from '@/lib/link-errors';
-import type { Employee, ExternalIdentity } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import type { ChatStatus, Employee, ExternalIdentity } from '@/lib/types';
+import { formatDate, formatDateTime } from '@/lib/utils';
 
 export interface LinkResult {
   status: 'connected' | 'error';
@@ -24,7 +24,14 @@ const SCOPE_LABELS: Record<string, string> = {
   profile: 'Name and photo',
   'https://www.googleapis.com/auth/userinfo.email': 'Email address',
   'https://www.googleapis.com/auth/userinfo.profile': 'Name and photo',
+  'https://www.googleapis.com/auth/chat.messages.readonly': 'Read Chat messages',
+  'https://www.googleapis.com/auth/chat.messages.create': 'Post Chat messages',
+  'https://www.googleapis.com/auth/chat.spaces.readonly': 'See Chat spaces',
+  'https://www.googleapis.com/auth/directory.readonly': 'Company directory',
+  'https://www.googleapis.com/auth/pubsub': 'Chat event queue',
 };
+
+const CHAT_READ = 'https://www.googleapis.com/auth/chat.messages.readonly';
 
 /**
  * The employee's company Google account (Identity linking flow B and D): link it by
@@ -34,12 +41,14 @@ export function GoogleAccount({
   employee,
   identities,
   googleConfigured,
+  chat,
   isAdmin,
   result,
 }: {
   employee: Employee;
   identities: ExternalIdentity[];
   googleConfigured: boolean;
+  chat: ChatStatus | null;
   isAdmin: boolean;
   result: LinkResult | null;
 }) {
@@ -79,9 +88,14 @@ export function GoogleAccount({
         )}
 
         {connected ? (
-          <Linked employee={employee} identity={connected} isAdmin={isAdmin} />
+          <Linked employee={employee} identity={connected} isAdmin={isAdmin} chat={chat} />
         ) : (
-          <NotLinked employee={employee} googleConfigured={googleConfigured} isAdmin={isAdmin} />
+          <NotLinked
+            employee={employee}
+            googleConfigured={googleConfigured}
+            isAdmin={isAdmin}
+            chatConfigured={chat?.configured ?? false}
+          />
         )}
 
         {past.length > 0 && (
@@ -109,10 +123,12 @@ function NotLinked({
   employee,
   googleConfigured,
   isAdmin,
+  chatConfigured,
 }: {
   employee: Employee;
   googleConfigured: boolean;
   isAdmin: boolean;
+  chatConfigured: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<ClientApiError | null>(null);
@@ -167,7 +183,7 @@ function NotLinked({
       <p>
         Google will ask you to sign in. Choose <span className="font-medium">{employee.email}</span>
         , not your own account, and allow the permissions it lists: sign-in, email address, name and
-        photo.
+        photo{chatConfigured ? ', and reading and posting its Google Chat messages' : ''}.
       </p>
       <Button onClick={() => void start()} loading={pending}>
         <ExternalLink className="size-4" aria-hidden />
@@ -181,10 +197,12 @@ function Linked({
   employee,
   identity,
   isAdmin,
+  chat,
 }: {
   employee: Employee;
   identity: ExternalIdentity;
   isAdmin: boolean;
+  chat: ChatStatus | null;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -238,6 +256,10 @@ function Linked({
           </Button>
         )}
       </div>
+
+      {chat?.configured && (
+        <ChatLine chat={chat} granted={identity.granted_scopes.includes(CHAT_READ)} />
+      )}
 
       {stuck && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-gray-300 px-4 py-3">
@@ -298,5 +320,38 @@ function Linked({
         </div>
       )}
     </div>
+  );
+}
+
+/** Whether the employee is listening to Google Chat, and since when. */
+function ChatLine({ chat, granted }: { chat: ChatStatus; granted: boolean }) {
+  const sub = chat.subscription;
+  if (!granted) {
+    return (
+      <p role="alert" className="text-sm font-semibold text-red-600">
+        Error: Chat access wasn’t granted. Disconnect and link the account again to allow it.
+      </p>
+    );
+  }
+  if (sub?.last_error) {
+    return (
+      <p role="alert" className="text-sm font-semibold text-red-600 [overflow-wrap:anywhere]">
+        Error: Google Chat isn’t connected: {sub.last_error}
+      </p>
+    );
+  }
+  if (!sub) {
+    return (
+      <p className="text-sm text-gray-600">
+        Google Chat: connecting… The worker sets this up within a minute.
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm text-gray-600">
+      Google Chat: {sub.state === 'active' ? 'listening in all its spaces' : 'paused by Google'}
+      {sub.last_event_at ? ` · last message ${formatDateTime(sub.last_event_at)}` : ''}
+      {sub.expire_time ? ` · renews before ${formatDateTime(sub.expire_time)}` : ''}
+    </p>
   );
 }

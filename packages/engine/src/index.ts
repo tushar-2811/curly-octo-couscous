@@ -88,3 +88,26 @@ export {
   type ExtractResult,
   type FactKind,
 } from './facts-extract';
+export { GoogleApiError, type GoogleErrorCode } from './google/errors';
+export { GoogleTokenBroker, type AccessToken } from './google/token-broker';
+export {
+  GoogleWorkspace,
+  type ChatMessage,
+  type ChatSpace,
+  type Person,
+  type PulledMessage,
+  type WorkspaceSubscription,
+} from './google/workspace';
+export {
+  ALL_SPACES,
+  chatEmployees,
+  ensureChatSubscription,
+  eventMessageNames,
+  handleChatEvent,
+  ingestChatMessage,
+  MESSAGE_CREATED,
+  noteSubscriptionError,
+  sendQueuedReplies,
+  sendReply,
+  type ChatDeps,
+} from './google/chat';

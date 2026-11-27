@@ -16,6 +16,18 @@ export const GOOGLE_PROVIDER = 'google_workspace' as const;
 /** Identity only for now; Chat and directory scopes are added by incremental consent. */
 export const IDENTITY_SCOPES = ['openid', 'email', 'profile'] as const;
 
+/**
+ * Asked for as well when Google Chat is set up (Phase 2): read and post Chat messages, see
+ * space names, look up people in the company directory, and read the Chat event queue.
+ */
+export const CHAT_SCOPES = [
+  'https://www.googleapis.com/auth/chat.messages.readonly',
+  'https://www.googleapis.com/auth/chat.messages.create',
+  'https://www.googleapis.com/auth/chat.spaces.readonly',
+  'https://www.googleapis.com/auth/directory.readonly',
+  'https://www.googleapis.com/auth/pubsub',
+] as const;
+
 export const LINK_REQUEST_TTL_MS = 10 * 60 * 1000;
 
 export type LinkErrorCode =

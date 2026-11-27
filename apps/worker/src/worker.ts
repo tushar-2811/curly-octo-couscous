@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { createDb } from '@aiw/db';
-import { createModels } from '@aiw/engine';
+import { createModels, GoogleTokenBroker, GoogleWorkspace } from '@aiw/engine';
+import { SecretBox } from '@aiw/platform';
+import { ChatRunner } from './chat-runner';
 import { fileURLToPath } from 'node:url';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
 import { Client, Connection } from '@temporalio/client';
@@ -80,13 +82,44 @@ else logger.warn('memory embeddings are off: VOYAGE_API_KEY is not set');
 if (models.jira) logger.info({ site: models.jira.site }, 'jira reading enabled');
 else logger.warn('jira is off: set JIRA_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_ACCESS_TOKEN');
 
+const chatSettings =
+  config.GOOGLE_CLIENT_ID &&
+  config.GOOGLE_CLIENT_SECRET &&
+  config.TOKEN_ENCRYPTION_KEY &&
+  config.GOOGLE_CLOUD_PROJECT &&
+  config.CHAT_EVENTS_TOPIC &&
+  config.CHAT_EVENTS_SUBSCRIPTION
+    ? {
+        clientId: config.GOOGLE_CLIENT_ID,
+        clientSecret: config.GOOGLE_CLIENT_SECRET,
+        key: config.TOKEN_ENCRYPTION_KEY,
+        topic: `projects/${config.GOOGLE_CLOUD_PROJECT}/topics/${config.CHAT_EVENTS_TOPIC}`,
+        subscription: `projects/${config.GOOGLE_CLOUD_PROJECT}/subscriptions/${config.CHAT_EVENTS_SUBSCRIPTION}`,
+      }
+    : null;
+const broker = chatSettings
+  ? new GoogleTokenBroker({
+      db,
+      secrets: new SecretBox(chatSettings.key),
+      clientId: chatSettings.clientId,
+      clientSecret: chatSettings.clientSecret,
+      logger,
+    })
+  : null;
+const google = broker ? new GoogleWorkspace(broker, logger) : null;
+if (!chatSettings) {
+  logger.warn(
+    'google chat is off: set the Google client, TOKEN_ENCRYPTION_KEY, GOOGLE_CLOUD_PROJECT, CHAT_EVENTS_TOPIC and CHAT_EVENTS_SUBSCRIPTION',
+  );
+}
+
 const connection = await connect();
 const worker = await Worker.create({
   connection,
   namespace: config.TEMPORAL_NAMESPACE,
   taskQueue: config.TEMPORAL_TASK_QUEUE,
   ...workflowSource(),
-  activities: createActivities({ logger, db, ...models }),
+  activities: createActivities({ logger, db, ...models, google }),
   interceptors: { activity: [() => ({ inbound: new ActivityLoggingInterceptor(logger) })] },
 });
 
@@ -115,11 +148,27 @@ const sweep = async () => {
   }
 };
 const sweepTimer = setInterval(() => void sweep(), config.MESSAGE_SWEEP_SECONDS * 1000);
+
+const chat =
+  chatSettings && broker && google
+    ? new ChatRunner({
+        db,
+        google,
+        broker,
+        client,
+        logger,
+        taskQueue: config.TEMPORAL_TASK_QUEUE,
+        topic: chatSettings.topic,
+        subscription: chatSettings.subscription,
+      })
+    : null;
+chat?.start();
 setTimeout(() => void sweep(), 5000);
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
     clearInterval(sweepTimer);
+    void chat?.stop();
     logger.info({ signal }, 'shutting down worker; finishing in-flight tasks');
     worker.shutdown();
   });

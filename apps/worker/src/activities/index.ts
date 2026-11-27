@@ -2,7 +2,11 @@ import { withTenant, type Database, type Kysely } from '@aiw/db';
 import {
   EngineError,
   extractConversationFacts,
+  GoogleApiError,
   processMessage,
+  sendQueuedReplies,
+  sendReply,
+  type GoogleWorkspace,
   type Embedder,
   type JiraReader,
   type StructuredLlm,
@@ -19,6 +23,8 @@ export interface ActivityDeps {
   llm?: StructuredLlm | null;
   embedder?: Embedder | null;
   jira?: JiraReader | null;
+  /** Google Chat, when set up: replies are posted as the employee. */
+  google?: GoogleWorkspace | null;
 }
 
 export interface MessageOutcome {
@@ -73,6 +79,16 @@ export function createActivities(deps: ActivityDeps) {
             embedder: deps.embedder ?? null,
             jira: deps.jira ?? null,
             logger: deps.logger,
+            ...(deps.google
+              ? {
+                  deliverNow: (reply) =>
+                    sendReply(
+                      { db: requireDb(), google: deps.google!, logger: deps.logger },
+                      input.orgId,
+                      reply.id,
+                    ),
+                }
+              : {}),
           },
           input.orgId,
           input.messageId,
@@ -117,6 +133,29 @@ export function createActivities(deps: ActivityDeps) {
         input.conversationKey,
       );
       return { read: result.read, added: result.added.length, superseded: result.superseded };
+    },
+
+    /**
+     * Post a message's queued replies to Chat. Safe to retry: each reply is sent with its
+     * own id as Chat's requestId. Temporary failures throw so Temporal tries again.
+     */
+    async sendReplies(input: {
+      orgId: string;
+      messageId: string;
+    }): Promise<{ sent: number; failed: number }> {
+      if (!deps.google) return { sent: 0, failed: 0 };
+      try {
+        return await sendQueuedReplies(
+          { db: requireDb(), google: deps.google, logger: deps.logger },
+          input.orgId,
+          input.messageId,
+        );
+      } catch (err) {
+        if (err instanceof GoogleApiError && !err.retryable) {
+          throw ApplicationFailure.nonRetryable(err.message, `Google:${err.code}`);
+        }
+        throw err;
+      }
     },
   };
 }

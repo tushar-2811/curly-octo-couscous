@@ -7,6 +7,16 @@
 import { ActivityFailure, ApplicationFailure, log, proxyActivities } from '@temporalio/workflow';
 import type { Activities, MessageOutcome } from '../activities';
 
+const { sendReplies } = proxyActivities<Activities>({
+  startToCloseTimeout: '1 minute',
+  retry: {
+    initialInterval: '3 seconds',
+    backoffCoefficient: 2,
+    maximumInterval: '1 minute',
+    maximumAttempts: 8,
+  },
+});
+
 const { processInboundMessage } = proxyActivities<Activities>({
   // Classification, embeddings and a reply draft, each with its own timeout.
   startToCloseTimeout: '2 minutes',
@@ -32,6 +42,10 @@ export async function messageWorkflow(input: MessageInput): Promise<MessageResul
   try {
     const outcome = await processInboundMessage(input);
     log.info('message processed', { message_id: input.messageId, ...outcome });
+    if (outcome.replies > 0) {
+      const sent = await sendReplies(input);
+      log.info('replies sent', { message_id: input.messageId, ...sent });
+    }
     return outcome;
   } catch (err) {
     const cause = err instanceof ActivityFailure ? err.cause : err;

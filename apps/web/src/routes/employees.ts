@@ -128,8 +128,18 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
   app.get('/v1/employees/:id', async (request) => {
     const { ctx } = await requireMember(request, db);
     const { id } = idParam.parse(request.params);
-    const [row, identities] = await withTenant(db, ctx.orgId, (trx) =>
-      Promise.all([getEmployee(trx, id), listIdentities(trx, id)]),
+    const [row, identities, chatSub] = await withTenant(db, ctx.orgId, (trx) =>
+      Promise.all([
+        getEmployee(trx, id),
+        listIdentities(trx, id),
+        trx
+          .selectFrom('conversations.chat_subscriptions')
+          .select(['state', 'expire_time', 'last_event_at', 'last_error'])
+          .where('employee_id', '=', id)
+          .where('state', '<>', 'deleted')
+          .orderBy('created_at', 'desc')
+          .executeTakeFirst(),
+      ]),
     );
     const template = findRoleTemplate(row.role_key);
     return {
@@ -138,6 +148,19 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
       onboarding: onboardingChecklist(row, template),
       identities: identities.map(identityDto),
       google_configured: Boolean(deps.google),
+      chat: {
+        configured: Boolean(deps.google?.scopes?.some((s) => s.includes('/auth/chat.'))),
+        subscription: chatSub
+          ? {
+              state: chatSub.state,
+              expire_time: chatSub.expire_time ? new Date(chatSub.expire_time).toISOString() : null,
+              last_event_at: chatSub.last_event_at
+                ? new Date(chatSub.last_event_at).toISOString()
+                : null,
+              last_error: chatSub.last_error,
+            }
+          : null,
+      },
     };
   });
 

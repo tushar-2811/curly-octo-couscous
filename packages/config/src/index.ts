@@ -46,6 +46,26 @@ export const aiEnvSchema = z.object({
     .optional(),
 });
 
+/**
+ * Google Workspace for AI employees: OAuth client, token encryption, and Chat intake.
+ * Chat is on when the project, topic and subscription are set as well.
+ */
+export const googleEnvSchema = z.object({
+  GOOGLE_CLIENT_ID: z.string().trim().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
+  /** Encrypts refresh tokens at rest: 32 random bytes, base64. */
+  TOKEN_ENCRYPTION_KEY: z.string().trim().optional(),
+  GOOGLE_CLOUD_PROJECT: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/, 'Use the project ID, e.g. my-project-123456')
+    .optional(),
+  /** Pub/Sub topic Chat events are published to (ID within the project). */
+  CHAT_EVENTS_TOPIC: z.string().trim().min(1).optional(),
+  /** Pull subscription on that topic the worker reads. */
+  CHAT_EVENTS_SUBSCRIPTION: z.string().trim().min(1).optional(),
+});
+
 export class ConfigError extends Error {
   constructor(
     message: string,

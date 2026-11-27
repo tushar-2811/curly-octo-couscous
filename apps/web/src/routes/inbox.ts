@@ -40,7 +40,7 @@ function messageDto(m: InboundMessage) {
     id: m.id,
     source: m.source,
     space_type: m.space_type,
-    space_name: m.space_name,
+    space_name: m.space_display_name ?? m.space_name,
     thread_key: m.thread_key,
     sender: { member_id: m.sender_member_id, name: m.sender_name, email: m.sender_email },
     subject: m.subject,
@@ -85,6 +85,7 @@ function replyDto(r: OutboundMessage) {
     input_tokens: r.input_tokens,
     output_tokens: r.output_tokens,
     error_code: r.error_code,
+    sent_at: r.sent_at ? new Date(r.sent_at).toISOString() : null,
     created_at: new Date(r.created_at).toISOString(),
   };
 }

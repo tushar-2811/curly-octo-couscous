@@ -235,6 +235,9 @@ export interface InboundMessagesTable {
   last_error: string | null;
   /** Generated: thread, else space, else the direct chat with the sender. */
   conversation_key: GeneratedAlways<string>;
+  /** Chat thread to reply in (Chat's resource name). */
+  reply_thread: ColumnType<string | null, string | null | undefined, string | null>;
+  space_display_name: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 /** What the employee decided to do with a message, and why. */
@@ -335,6 +338,23 @@ export interface OutboundMessagesTable {
   error_code: string | null;
   created_at: Timestamp;
   sent_at: Timestamp | null;
+  /** The Chat message created for it. */
+  external_id: ColumnType<string | null, string | null | undefined, string | null>;
+}
+
+/** An employee's Workspace Events subscription to its Chat messages. */
+export interface ChatSubscriptionsTable {
+  id: Generated<string>;
+  org_id: string;
+  employee_id: string;
+  subscription_name: string;
+  target_resource: string;
+  state: Generated<'active' | 'suspended' | 'deleted'>;
+  expire_time: Timestamp | null;
+  last_event_at: Timestamp | null;
+  last_error: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export interface Database {
@@ -349,6 +369,7 @@ export interface Database {
   'conversations.inbound_messages': InboundMessagesTable;
   'conversations.message_decisions': MessageDecisionsTable;
   'conversations.outbound_messages': OutboundMessagesTable;
+  'conversations.chat_subscriptions': ChatSubscriptionsTable;
   'knowledge.memory_items': MemoryItemsTable;
   'knowledge.space_members': SpaceMembersTable;
   'knowledge.memory_sources': MemorySourcesTable;
@@ -372,3 +393,4 @@ export type InboundMessage = Selectable<InboundMessagesTable>;
 export type MessageDecision = Selectable<MessageDecisionsTable>;
 export type MemoryItem = Selectable<MemoryItemsTable>;
 export type OutboundMessage = Selectable<OutboundMessagesTable>;
+export type ChatSubscription = Selectable<ChatSubscriptionsTable>;

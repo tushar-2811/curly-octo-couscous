@@ -2,6 +2,7 @@ import {
   aiEnvSchema,
   baseEnvSchema,
   databaseEnvSchema,
+  googleEnvSchema,
   loadConfig,
   temporalEnvSchema,
   z,
@@ -13,6 +14,7 @@ export const workerEnvSchema = baseEnvSchema
   .extend(temporalEnvSchema.shape)
   .extend(databaseEnvSchema.shape)
   .extend(aiEnvSchema.shape)
+  .extend(googleEnvSchema.shape)
   .extend({
     TEMPORAL_TASK_QUEUE: z.string().default(TASK_QUEUE_WORKFLOWS),
     /** How often to look for messages that were never processed or should be retried. */

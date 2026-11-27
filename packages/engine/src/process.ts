@@ -29,6 +29,8 @@ export interface EngineDeps {
   embedder?: Embedder | null;
   /** Read-only Jira. Null when not configured: questions that need it say so. */
   jira?: JiraReader | null;
+  /** Send a queued reply right away (Chat). Used for "Looking into it…" before slow work. */
+  deliverNow?: (reply: OutboundMessage) => Promise<OutboundMessage>;
   logger: Logger;
   policy?: DecisionPolicy;
 }
@@ -155,8 +157,8 @@ export async function processMessage(
       memberId: employee.id,
       displayName: employee.display_name,
       emails,
-      // Google Chat ids arrive with Chat intake (slice 2).
-      chatUserIds: [],
+      // Chat user ids are Google account ids: users/<sub>.
+      chatUserIds: identities.map((i) => `users/${i.provider_user_id}`),
     },
     {
       orgDomain: org.domain,
@@ -271,6 +273,31 @@ export async function processMessage(
   if (wantsReply && deps.llm) {
     const outStatus: 'draft' | 'queued' = message.source === 'simulated' ? 'draft' : 'queued';
     const base = { org_id: orgId, employee_id: employee.id, in_reply_to: messageId };
+    // Slow lookups ahead: save and send "Looking into it…" before doing them.
+    const ackRows = decision.ackFirst
+      ? await insertReplies(deps, orgId, [
+          {
+            ...base,
+            kind: 'ack',
+            body: ACK_TEXT,
+            status: outStatus,
+            answered: null,
+            sources: '[]',
+            model: null,
+            latency_ms: null,
+            input_tokens: null,
+            output_tokens: null,
+            error_code: null,
+          },
+        ])
+      : [];
+    if (deps.deliverNow && ackRows[0]?.status === 'queued') {
+      try {
+        ackRows[0] = await deps.deliverNow(ackRows[0]);
+      } catch (err) {
+        log.warn({ err }, 'could not send the "looking into it" note; carrying on with the reply');
+      }
+    }
     const readers = readersFor(saved.updated);
     const [memoryHits, jira] = await Promise.all([
       withTenant(deps.db, orgId, (trx) =>
@@ -374,24 +401,7 @@ export async function processMessage(
         error_code: err.code,
       };
     }
-    const ack = decision.ackFirst
-      ? [
-          {
-            ...base,
-            kind: 'ack' as const,
-            body: ACK_TEXT,
-            status: outStatus,
-            answered: null,
-            sources: '[]',
-            model: null,
-            latency_ms: null,
-            input_tokens: null,
-            output_tokens: null,
-            error_code: null,
-          },
-        ]
-      : [];
-    replies = await insertReplies(deps, orgId, [...ack, row]);
+    replies = [...ackRows, ...(await insertReplies(deps, orgId, [row]))];
   }
 
   log.info(

@@ -228,18 +228,17 @@ describe.skipIf(!url)('fact extraction', () => {
 
   it('finds quiet conversations for the worker sweep', async () => {
     const m = await say(mia, 'Design review moved to Monday', { spaceName: 'spaces/design' });
-    expect(
-      (await conversationsToDigest(db, 600, 200)).some(
-        (c) => c.conversation_key === m.conversation_key,
-      ),
-    ).toBe(false);
+    // Earlier test runs leave quiet conversations with the same name for other employees.
+    const mine = (c: { employee_id: string; conversation_key: string }) =>
+      c.employee_id === nova.id && c.conversation_key === m.conversation_key;
+    expect((await conversationsToDigest(db, 600, 200)).some(mine)).toBe(false);
     await db
       .updateTable('conversations.inbound_messages')
       .set({ received_at: sql<Date>`now() - interval '20 minutes'` })
       .where('id', '=', m.id)
       .execute();
     const ready = await conversationsToDigest(db, 600, 200);
-    expect(ready.find((c) => c.conversation_key === m.conversation_key)).toMatchObject({
+    expect(ready.find(mine)).toMatchObject({
       employee_id: nova.id,
       last_message_id: m.id,
     });

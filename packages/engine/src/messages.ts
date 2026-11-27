@@ -19,6 +19,9 @@ export interface InboundInput {
   threadKey: string | null;
   spaceName: string | null;
   spaceType: SpaceType | null;
+  /** Chat thread to reply in. */
+  replyThread?: string | null;
+  spaceDisplayName?: string | null;
   senderEmail: string | null;
   senderName: string | null;
   subject: string | null;
@@ -62,6 +65,8 @@ export async function recordInbound(
       thread_key: input.threadKey,
       space_name: input.spaceName,
       space_type: input.spaceType,
+      reply_thread: input.replyThread ?? null,
+      space_display_name: input.spaceDisplayName ?? null,
       sender_email: senderEmail,
       sender_name: input.senderName,
       sender_member_id: sender?.id ?? null,

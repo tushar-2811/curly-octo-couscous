@@ -144,4 +144,15 @@ export interface EmployeeDetail {
   onboarding: { state: AiState; onboarding: boolean; checks: OnboardingCheck[] };
   identities: ExternalIdentity[];
   google_configured: boolean;
+  chat?: ChatStatus;
+}
+
+export interface ChatStatus {
+  configured: boolean;
+  subscription: {
+    state: 'active' | 'suspended';
+    expire_time: string | null;
+    last_event_at: string | null;
+    last_error: string | null;
+  } | null;
 }
