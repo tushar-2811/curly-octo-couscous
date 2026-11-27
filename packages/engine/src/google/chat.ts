@@ -163,6 +163,33 @@ function spaceTypeOf(space: ChatSpace): SpaceType {
 }
 
 /**
+ * Who sent a message. Chat includes the name and email when user auth reads it; the
+ * People API is only asked when they are missing, since it returns an empty profile
+ * when the Workspace turns off directory sharing.
+ */
+async function senderOf(
+  deps: ChatDeps,
+  auth: Auth,
+  sender: { name: string; displayName?: string; email?: string } | undefined,
+  log: Logger,
+): Promise<{ name: string | null; email: string | null }> {
+  const fromChat = {
+    name: sender?.displayName?.trim() || null,
+    email: sender?.email?.trim().toLowerCase() || null,
+  };
+  if (!sender?.name || (fromChat.name && fromChat.email)) return fromChat;
+  const person = await deps.google.person(auth, sender.name);
+  const found = { name: fromChat.name ?? person.name, email: fromChat.email ?? person.email };
+  if (!found.email) {
+    log.warn(
+      { sender: sender.name, has_name: found.name !== null },
+      'chat sender has no email; it is treated as outside the company',
+    );
+  }
+  return found;
+}
+
+/**
  * Store one Chat message for the employee. Returns the stored message id to process, or
  * null when there is nothing to do (its own message, a bot, already stored).
  */
@@ -190,7 +217,7 @@ export async function ingestChatMessage(
   const spaceName = message.space?.name ?? messageName.split('/messages/')[0]!;
   const [space, person] = await Promise.all([
     deps.google.getSpace(auth, spaceName),
-    deps.google.person(auth, sender),
+    senderOf(deps, auth, message.sender, log),
   ]);
   const mentions = (message.annotations ?? [])
     .filter((a) => a.type === 'USER_MENTION' && a.userMention?.user?.name)

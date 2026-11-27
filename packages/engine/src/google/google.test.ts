@@ -239,6 +239,32 @@ describe.skipIf(!url)('google chat', () => {
     );
   });
 
+  it('takes the sender from Chat itself, without asking the People API', async () => {
+    // The fake People API has no users/222: asking it would fail the event.
+    fake.messages.set('spaces/S1/messages/3', {
+      name: 'spaces/S1/messages/3',
+      text: 'hey',
+      createTime: '2026-11-28T10:01:00Z',
+      sender: {
+        name: 'users/222',
+        type: 'HUMAN',
+        displayName: 'Raj Kumar',
+        email: 'Raj@co.test',
+      },
+      space: { name: 'spaces/S1' },
+    });
+    const r = await handleChatEvent(deps, event('spaces/S1/messages/3'), async () => `999${run}`);
+    expect(r.messageIds).toHaveLength(1);
+    const stored = await withTenant(db, ctx.orgId, (trx) =>
+      trx
+        .selectFrom('conversations.inbound_messages')
+        .select(['sender_email', 'sender_name'])
+        .where('id', '=', r.messageIds[0]!)
+        .executeTakeFirstOrThrow(),
+    );
+    expect(stored).toEqual({ sender_email: 'raj@co.test', sender_name: 'Raj Kumar' });
+  });
+
   it('posts queued replies in the thread exactly once', async () => {
     const inbound = await withTenant(db, ctx.orgId, (trx) =>
       trx

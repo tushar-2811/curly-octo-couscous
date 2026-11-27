@@ -7,7 +7,7 @@ export interface ChatMessage {
   name: string;
   text?: string;
   createTime: string;
-  sender?: { name: string; type?: 'HUMAN' | 'BOT' };
+  sender?: { name: string; type?: 'HUMAN' | 'BOT'; displayName?: string; email?: string };
   thread?: { name: string };
   threadReply?: boolean;
   space?: { name: string };
