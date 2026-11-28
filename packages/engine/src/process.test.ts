@@ -161,6 +161,29 @@ describe.skipIf(!url)('processing messages', () => {
     expect(llm.requests).toHaveLength(2);
   });
 
+  it('answers an email in one signed reply, without a "looking into it" email', async () => {
+    const { message } = await receive({
+      source: 'gmail',
+      spaceType: 'email',
+      spaceName: null,
+      threadKey: `gmail-thread-${run}`,
+      replyThread: `gmail-thread-${run}`,
+      subject: 'WEB-12 status',
+      body: 'Hi Nova, where is WEB-12?',
+      to: [`nova@${domain}`],
+    });
+    llm.next.push(answer());
+    llm.replies.push({ reply: 'Hi Mia,\nWEB-12 is in review.', answered: 'yes', used_sources: [] });
+    const before = llm.requests.length;
+    const result = await processMessage({ db, llm, logger: silent }, ctx.orgId, message.id);
+    expect(result.facts).toMatchObject({ recipient_role: 'to' });
+    expect(result.replies.map((r) => [r.kind, r.status])).toEqual([['reply', 'queued']]);
+    expect(result.replies[0]!.body).toBe('Hi Mia,\nWEB-12 is in review.\n\nNova');
+    const prompt = llm.requests[before + 1]!.input;
+    expect(prompt).toContain('Channel: email');
+    expect(prompt).toContain('an email with the subject "WEB-12 status"');
+  });
+
   it('answers from memory the asker could see, citing only real sources', async () => {
     const earlier = await receive({ body: 'Heads up: the checkout redesign ships on 4 December' });
     llm.next.push(

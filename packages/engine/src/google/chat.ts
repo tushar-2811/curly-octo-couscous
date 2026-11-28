@@ -313,95 +313,30 @@ export async function handleChatEvent(
   return { auth, messageIds: ids, type };
 }
 
-/**
- * Post one queued reply to Chat as the employee. Safe to repeat: the reply's id is Chat's
- * requestId, so a retry returns the message already posted. Retryable failures throw;
- * others mark the reply failed.
- */
-export async function sendReply(
-  deps: { db: Kysely<Database>; google: GoogleWorkspace; logger: Logger },
-  orgId: string,
-  replyId: string,
-): Promise<OutboundMessage> {
-  const loaded = await withTenant(deps.db, orgId, async (trx) => {
-    const reply = await trx
-      .selectFrom('conversations.outbound_messages')
-      .selectAll()
-      .where('id', '=', replyId)
-      .executeTakeFirstOrThrow();
-    const inbound = await trx
-      .selectFrom('conversations.inbound_messages')
-      .select(['source', 'space_name', 'space_type', 'reply_thread'])
-      .where('id', '=', reply.in_reply_to)
-      .executeTakeFirstOrThrow();
-    return { reply, inbound };
-  });
-  const { reply, inbound } = loaded;
-  if (reply.status !== 'queued' || inbound.source !== 'google_chat' || !inbound.space_name) {
-    return reply;
-  }
-  const auth = { orgId, employeeId: reply.employee_id };
-  const started = performance.now();
-  try {
-    const posted = await deps.google.createMessage(auth, inbound.space_name, {
-      text: reply.body,
-      threadName: inbound.space_type === 'direct' ? null : inbound.reply_thread,
-      requestId: reply.id,
-    });
-    const sent = await withTenant(deps.db, orgId, (trx) =>
-      trx
-        .updateTable('conversations.outbound_messages')
-        .set({ status: 'sent', sent_at: new Date(), external_id: posted.name, error_code: null })
-        .where('id', '=', reply.id)
-        .returningAll()
-        .executeTakeFirstOrThrow(),
-    );
-    deps.logger.info(
-      {
-        reply_id: reply.id,
-        kind: reply.kind,
-        chat_message: posted.name,
-        send_ms: Math.round(performance.now() - started),
-      },
-      'reply sent to chat',
-    );
-    return sent;
-  } catch (err) {
-    const code = err instanceof GoogleApiError ? err.code : 'unknown';
-    deps.logger.error({ err, reply_id: reply.id, code }, 'sending reply to chat failed');
-    if (err instanceof GoogleApiError && err.retryable) throw err;
-    return withTenant(deps.db, orgId, (trx) =>
-      trx
-        .updateTable('conversations.outbound_messages')
-        .set({ status: 'failed', error_code: `chat_${code}` })
-        .where('id', '=', reply.id)
-        .returningAll()
-        .executeTakeFirstOrThrow(),
-    );
-  }
+/** The inbound fields a Chat reply needs. */
+export interface ChatReplyTarget {
+  space_name: string | null;
+  space_type: SpaceType | null;
+  reply_thread: string | null;
 }
 
-/** Send every queued reply for a message, oldest first. */
-export async function sendQueuedReplies(
-  deps: { db: Kysely<Database>; google: GoogleWorkspace; logger: Logger },
-  orgId: string,
-  messageId: string,
-): Promise<{ sent: number; failed: number }> {
-  const queued = await withTenant(deps.db, orgId, (trx) =>
-    trx
-      .selectFrom('conversations.outbound_messages')
-      .select('id')
-      .where('in_reply_to', '=', messageId)
-      .where('status', '=', 'queued')
-      .orderBy('id')
-      .execute(),
-  );
-  let sent = 0;
-  let failed = 0;
-  for (const q of queued) {
-    const r = await sendReply(deps, orgId, q.id);
-    if (r.status === 'sent') sent++;
-    else if (r.status === 'failed') failed++;
+/**
+ * Post a reply to Chat as the employee. Safe to repeat: the reply's id is Chat's
+ * requestId, so a retry returns the message already posted.
+ */
+export async function postChatReply(
+  deps: { google: GoogleWorkspace },
+  auth: Auth,
+  reply: OutboundMessage,
+  target: ChatReplyTarget,
+): Promise<{ externalId: string; alreadySent: boolean }> {
+  if (!target.space_name) {
+    throw new GoogleApiError('bad_request', 'Chat: the message has no space to reply in');
   }
-  return { sent, failed };
+  const posted = await deps.google.createMessage(auth, target.space_name, {
+    text: reply.body,
+    threadName: target.space_type === 'direct' ? null : target.reply_thread,
+    requestId: reply.id,
+  });
+  return { externalId: posted.name, alreadySent: false };
 }

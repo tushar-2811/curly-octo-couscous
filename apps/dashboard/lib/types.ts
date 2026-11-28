@@ -145,6 +145,7 @@ export interface EmployeeDetail {
   identities: ExternalIdentity[];
   google_configured: boolean;
   chat?: ChatStatus;
+  gmail?: GmailStatus;
 }
 
 export interface ChatStatus {
@@ -153,6 +154,17 @@ export interface ChatStatus {
     state: 'active' | 'suspended';
     expire_time: string | null;
     last_event_at: string | null;
+    last_error: string | null;
+  } | null;
+}
+
+export interface GmailStatus {
+  configured: boolean;
+  mailbox: {
+    email: string;
+    watch_expiration: string | null;
+    last_event_at: string | null;
+    last_synced_at: string | null;
     last_error: string | null;
   } | null;
 }

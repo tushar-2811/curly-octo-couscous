@@ -38,16 +38,42 @@ export interface PulledMessage {
   message: { data?: string; attributes?: Record<string, string>; messageId: string };
 }
 
+/** A Gmail message part (format=full). */
+export interface GmailPart {
+  mimeType?: string;
+  filename?: string;
+  headers?: { name: string; value: string }[];
+  body?: { data?: string; size?: number; attachmentId?: string };
+  parts?: GmailPart[];
+}
+
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  labelIds?: string[];
+  internalDate?: string;
+  payload?: GmailPart;
+}
+
+export interface GmailHistoryPage {
+  history?: {
+    messagesAdded?: { message: { id: string; threadId: string; labelIds?: string[] } }[];
+  }[];
+  historyId?: string;
+  nextPageToken?: string;
+}
+
 type Auth = { orgId: string; employeeId: string };
 
 const CHAT = 'https://chat.googleapis.com/v1';
 const PEOPLE = 'https://people.googleapis.com/v1';
 const EVENTS = 'https://workspaceevents.googleapis.com/v1';
 const PUBSUB = 'https://pubsub.googleapis.com/v1';
+const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 /**
  * Google Workspace calls made as an AI employee (user authentication): Chat, People,
- * Workspace Events and Pub/Sub. A 401 drops the cached token and tries once more.
+ * Workspace Events, Gmail and Pub/Sub. A 401 drops the cached token and tries once more.
  */
 export class GoogleWorkspace {
   private readonly spaces = new Map<string, { space: ChatSpace; at: number }>();
@@ -255,6 +281,81 @@ export class GoogleWorkspace {
   async ack(auth: Auth, subscription: string, ackIds: string[]): Promise<void> {
     if (ackIds.length === 0) return;
     await this.call(auth, 'Pub/Sub', 'POST', `${PUBSUB}/${subscription}:acknowledge`, { ackIds });
+  }
+
+  // ── Gmail ─────────────────────────────────────────────────────────────────────────
+
+  gmailProfile(auth: Auth): Promise<{ emailAddress: string; historyId: string }> {
+    return this.call(auth, 'Gmail', 'GET', `${GMAIL}/profile`);
+  }
+
+  /**
+   * Ask Gmail to publish inbox changes to the topic. Calling it again renews the watch;
+   * it lasts 7 days. Returns the history id the watch starts from.
+   */
+  gmailWatch(auth: Auth, topic: string): Promise<{ historyId: string; expiration: string }> {
+    return this.call(auth, 'Gmail', 'POST', `${GMAIL}/watch`, {
+      topicName: topic,
+      labelIds: ['INBOX'],
+      labelFilterBehavior: 'INCLUDE',
+    });
+  }
+
+  /** Messages added to the inbox since a history id. Not found: the id is too old. */
+  gmailHistory(auth: Auth, startHistoryId: string, pageToken?: string): Promise<GmailHistoryPage> {
+    const params = new URLSearchParams({
+      startHistoryId,
+      historyTypes: 'messageAdded',
+      labelId: 'INBOX',
+      maxResults: '100',
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+    return this.call(auth, 'Gmail', 'GET', `${GMAIL}/history?${params.toString()}`);
+  }
+
+  /** Recent inbox message ids, for catching up when the history id is too old. */
+  async gmailRecentInbox(auth: Auth, max: number): Promise<{ id: string; threadId: string }[]> {
+    const params = new URLSearchParams({ q: 'in:inbox newer_than:2d', maxResults: String(max) });
+    const out = await this.call<{ messages?: { id: string; threadId: string }[] }>(
+      auth,
+      'Gmail',
+      'GET',
+      `${GMAIL}/messages?${params.toString()}`,
+    );
+    return out.messages ?? [];
+  }
+
+  gmailMessage(auth: Auth, id: string): Promise<GmailMessage> {
+    return this.call(
+      auth,
+      'Gmail',
+      'GET',
+      `${GMAIL}/messages/${encodeURIComponent(id)}?format=full`,
+    );
+  }
+
+  /** The thread's messages with only the given headers, for spotting a reply already sent. */
+  async gmailThreadHeaders(auth: Auth, threadId: string, header: string): Promise<GmailMessage[]> {
+    const params = new URLSearchParams({ format: 'metadata', metadataHeaders: header });
+    const out = await this.call<{ messages?: GmailMessage[] }>(
+      auth,
+      'Gmail',
+      'GET',
+      `${GMAIL}/threads/${encodeURIComponent(threadId)}?${params.toString()}`,
+    );
+    return out.messages ?? [];
+  }
+
+  /** Send a raw RFC 5322 message (base64url) as the employee, in a thread. */
+  gmailSend(
+    auth: Auth,
+    raw: string,
+    threadId: string | null,
+  ): Promise<{ id: string; threadId: string }> {
+    return this.call(auth, 'Gmail', 'POST', `${GMAIL}/messages/send`, {
+      raw,
+      ...(threadId ? { threadId } : {}),
+    });
   }
 
   log(): Logger {

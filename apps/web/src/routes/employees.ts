@@ -128,7 +128,7 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
   app.get('/v1/employees/:id', async (request) => {
     const { ctx } = await requireMember(request, db);
     const { id } = idParam.parse(request.params);
-    const [row, identities, chatSub] = await withTenant(db, ctx.orgId, (trx) =>
+    const [row, identities, chatSub, mailbox] = await withTenant(db, ctx.orgId, (trx) =>
       Promise.all([
         getEmployee(trx, id),
         listIdentities(trx, id),
@@ -139,8 +139,20 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
           .where('state', '<>', 'deleted')
           .orderBy('created_at', 'desc')
           .executeTakeFirst(),
+        trx
+          .selectFrom('conversations.gmail_mailboxes')
+          .select([
+            'email_address',
+            'watch_expiration',
+            'last_event_at',
+            'last_synced_at',
+            'last_error',
+          ])
+          .where('employee_id', '=', id)
+          .executeTakeFirst(),
       ]),
     );
+    const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
     const template = findRoleTemplate(row.role_key);
     return {
       employee: employeeDto(row),
@@ -158,6 +170,18 @@ export function registerEmployeeRoutes(app: FastifyInstance, deps: AuthDeps): vo
                 ? new Date(chatSub.last_event_at).toISOString()
                 : null,
               last_error: chatSub.last_error,
+            }
+          : null,
+      },
+      gmail: {
+        configured: Boolean(deps.google?.scopes?.some((s) => s.includes('/auth/gmail.'))),
+        mailbox: mailbox
+          ? {
+              email: mailbox.email_address,
+              watch_expiration: iso(mailbox.watch_expiration),
+              last_event_at: iso(mailbox.last_event_at),
+              last_synced_at: iso(mailbox.last_synced_at),
+              last_error: mailbox.last_error,
             }
           : null,
       },

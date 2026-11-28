@@ -274,23 +274,25 @@ export async function processMessage(
     const outStatus: 'draft' | 'queued' = message.source === 'simulated' ? 'draft' : 'queued';
     const base = { org_id: orgId, employee_id: employee.id, in_reply_to: messageId };
     // Slow lookups ahead: save and send "Looking into it…" before doing them.
-    const ackRows = decision.ackFirst
-      ? await insertReplies(deps, orgId, [
-          {
-            ...base,
-            kind: 'ack',
-            body: ACK_TEXT,
-            status: outStatus,
-            answered: null,
-            sources: '[]',
-            model: null,
-            latency_ms: null,
-            input_tokens: null,
-            output_tokens: null,
-            error_code: null,
-          },
-        ])
-      : [];
+    // Email gets one complete reply; a separate "looking into it" email would be noise.
+    const ackRows =
+      decision.ackFirst && message.source !== 'gmail'
+        ? await insertReplies(deps, orgId, [
+            {
+              ...base,
+              kind: 'ack',
+              body: ACK_TEXT,
+              status: outStatus,
+              answered: null,
+              sources: '[]',
+              model: null,
+              latency_ms: null,
+              input_tokens: null,
+              output_tokens: null,
+              error_code: null,
+            },
+          ])
+        : [];
     if (deps.deliverNow && ackRows[0]?.status === 'queued') {
       try {
         ackRows[0] = await deps.deliverNow(ackRows[0]);
@@ -335,11 +337,14 @@ export async function processMessage(
     try {
       const draft = await draftReply(deps.llm, {
         employee: { name: employee.display_name, role: employee.title ?? employee.role_key },
+        channel: message.source === 'gmail' ? 'email' : 'chat',
         senderName: message.sender_name ?? message.sender_email ?? 'Someone',
         where:
-          message.space_type === 'direct'
-            ? 'direct message to you'
-            : (message.space_name ?? 'a shared space'),
+          message.space_type === 'email'
+            ? `an email${message.subject ? ` with the subject "${message.subject}"` : ''}`
+            : message.space_type === 'direct'
+              ? 'direct message to you'
+              : (message.space_name ?? 'a shared space'),
         body: queryText,
         thread: thread.map((t) => ({ sender: t.sender, text: t.text })),
         task,
@@ -352,7 +357,9 @@ export async function processMessage(
       row = {
         ...base,
         kind: 'reply',
-        body: draft.reply,
+        // Email carries a signature; Chat shows who sent it.
+        body:
+          message.source === 'gmail' ? `${draft.reply}\n\n${employee.display_name}` : draft.reply,
         status: outStatus,
         answered: draft.answered,
         sources: JSON.stringify(

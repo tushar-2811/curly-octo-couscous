@@ -30,6 +30,9 @@ export interface InboundInput {
   to: string[];
   cc: string[];
   sentAt: Date;
+  /** Email only: Message-ID and References headers, for threading the reply. */
+  emailMessageId?: string | null;
+  emailReferences?: string | null;
 }
 
 /** Longest body kept, in characters. Longer emails are cut and marked. */
@@ -76,6 +79,8 @@ export async function recordInbound(
       to_addresses: input.to.map((a) => a.trim().toLowerCase()),
       cc_addresses: input.cc.map((a) => a.trim().toLowerCase()),
       sent_at: input.sentAt,
+      email_message_id: input.emailMessageId?.slice(0, 998) ?? null,
+      email_references: input.emailReferences?.slice(0, 8000) ?? null,
       last_error: null,
     })
     .onConflict((oc) => oc.columns(['employee_id', 'source', 'external_id']).doNothing())

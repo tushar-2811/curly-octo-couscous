@@ -63,7 +63,7 @@ export default async function EmployeePage({
     );
   }
 
-  const { employee, template, onboarding, identities, google_configured, chat } = detail;
+  const { employee, template, onboarding, identities, google_configured, chat, gmail } = detail;
   const terminated = employee.status === 'terminated';
 
   return (
@@ -123,6 +123,7 @@ export default async function EmployeePage({
           identities={identities}
           googleConfigured={google_configured}
           chat={chat ?? null}
+          gmail={gmail ?? null}
           isAdmin={isAdmin}
           result={linkResult}
         />

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { createDb } from '@aiw/db';
 import { createModels, GoogleTokenBroker, GoogleWorkspace } from '@aiw/engine';
 import { SecretBox } from '@aiw/platform';
-import { ChatRunner } from './chat-runner';
+import { GoogleRunner } from './google-runner';
 import { fileURLToPath } from 'node:url';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
 import { Client, Connection } from '@temporalio/client';
@@ -109,7 +109,7 @@ const broker = chatSettings
 const google = broker ? new GoogleWorkspace(broker, logger) : null;
 if (!chatSettings) {
   logger.warn(
-    'google chat is off: set the Google client, TOKEN_ENCRYPTION_KEY, GOOGLE_CLOUD_PROJECT, CHAT_EVENTS_TOPIC and CHAT_EVENTS_SUBSCRIPTION',
+    'google chat and gmail are off: set the Google client, TOKEN_ENCRYPTION_KEY, GOOGLE_CLOUD_PROJECT, CHAT_EVENTS_TOPIC and CHAT_EVENTS_SUBSCRIPTION',
   );
 }
 
@@ -149,9 +149,9 @@ const sweep = async () => {
 };
 const sweepTimer = setInterval(() => void sweep(), config.MESSAGE_SWEEP_SECONDS * 1000);
 
-const chat =
+const googleIntake =
   chatSettings && broker && google
-    ? new ChatRunner({
+    ? new GoogleRunner({
         db,
         google,
         broker,
@@ -162,13 +162,13 @@ const chat =
         subscription: chatSettings.subscription,
       })
     : null;
-chat?.start();
+googleIntake?.start();
 setTimeout(() => void sweep(), 5000);
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
     clearInterval(sweepTimer);
-    void chat?.stop();
+    void googleIntake?.stop();
     logger.info({ signal }, 'shutting down worker; finishing in-flight tasks');
     worker.shutdown();
   });

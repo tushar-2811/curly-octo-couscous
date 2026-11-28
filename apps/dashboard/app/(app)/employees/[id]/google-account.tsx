@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { clientFetch, ClientApiError } from '@/lib/client-api';
 import { linkErrorMessage } from '@/lib/link-errors';
-import type { ChatStatus, Employee, ExternalIdentity } from '@/lib/types';
+import type { ChatStatus, Employee, ExternalIdentity, GmailStatus } from '@/lib/types';
 import { formatDate, formatDateTime } from '@/lib/utils';
 
 export interface LinkResult {
@@ -28,10 +28,16 @@ const SCOPE_LABELS: Record<string, string> = {
   'https://www.googleapis.com/auth/chat.messages.create': 'Post Chat messages',
   'https://www.googleapis.com/auth/chat.spaces.readonly': 'See Chat spaces',
   'https://www.googleapis.com/auth/directory.readonly': 'Company directory',
-  'https://www.googleapis.com/auth/pubsub': 'Chat event queue',
+  'https://www.googleapis.com/auth/pubsub': 'Chat and Gmail event queue',
+  'https://www.googleapis.com/auth/gmail.readonly': 'Read email',
+  'https://www.googleapis.com/auth/gmail.send': 'Send email',
 };
 
 const CHAT_READ = 'https://www.googleapis.com/auth/chat.messages.readonly';
+const GMAIL_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+];
 
 /**
  * The employee's company Google account (Identity linking flow B and D): link it by
@@ -42,6 +48,7 @@ export function GoogleAccount({
   identities,
   googleConfigured,
   chat,
+  gmail,
   isAdmin,
   result,
 }: {
@@ -49,6 +56,7 @@ export function GoogleAccount({
   identities: ExternalIdentity[];
   googleConfigured: boolean;
   chat: ChatStatus | null;
+  gmail: GmailStatus | null;
   isAdmin: boolean;
   result: LinkResult | null;
 }) {
@@ -88,7 +96,13 @@ export function GoogleAccount({
         )}
 
         {connected ? (
-          <Linked employee={employee} identity={connected} isAdmin={isAdmin} chat={chat} />
+          <Linked
+            employee={employee}
+            identity={connected}
+            isAdmin={isAdmin}
+            chat={chat}
+            gmail={gmail}
+          />
         ) : (
           <NotLinked
             employee={employee}
@@ -183,7 +197,11 @@ function NotLinked({
       <p>
         Google will ask you to sign in. Choose <span className="font-medium">{employee.email}</span>
         , not your own account, and allow the permissions it lists: sign-in, email address, name and
-        photo{chatConfigured ? ', and reading and posting its Google Chat messages' : ''}.
+        photo
+        {chatConfigured
+          ? ', reading and posting its Google Chat messages, and reading and sending its email'
+          : ''}
+        .
       </p>
       <Button onClick={() => void start()} loading={pending}>
         <ExternalLink className="size-4" aria-hidden />
@@ -198,11 +216,13 @@ function Linked({
   identity,
   isAdmin,
   chat,
+  gmail,
 }: {
   employee: Employee;
   identity: ExternalIdentity;
   isAdmin: boolean;
   chat: ChatStatus | null;
+  gmail: GmailStatus | null;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -259,6 +279,12 @@ function Linked({
 
       {chat?.configured && (
         <ChatLine chat={chat} granted={identity.granted_scopes.includes(CHAT_READ)} />
+      )}
+      {gmail?.configured && (
+        <GmailLine
+          gmail={gmail}
+          granted={GMAIL_SCOPES.every((s) => identity.granted_scopes.includes(s))}
+        />
       )}
 
       {stuck && (
@@ -352,6 +378,40 @@ function ChatLine({ chat, granted }: { chat: ChatStatus; granted: boolean }) {
       Google Chat: {sub.state === 'active' ? 'listening in all its spaces' : 'paused by Google'}
       {sub.last_event_at ? ` · last message ${formatDateTime(sub.last_event_at)}` : ''}
       {sub.expire_time ? ` · renews before ${formatDateTime(sub.expire_time)}` : ''}
+    </p>
+  );
+}
+
+/** Whether the employee's inbox is being watched, and when mail last arrived. */
+function GmailLine({ gmail, granted }: { gmail: GmailStatus; granted: boolean }) {
+  const box = gmail.mailbox;
+  if (!granted) {
+    return (
+      <p role="alert" className="text-sm font-semibold text-red-600">
+        Error: Gmail access wasn’t granted. Disconnect and link the account again to allow reading
+        and sending its email.
+      </p>
+    );
+  }
+  if (box?.last_error) {
+    return (
+      <p role="alert" className="text-sm font-semibold text-red-600 [overflow-wrap:anywhere]">
+        Error: Gmail isn’t connected: {box.last_error}
+      </p>
+    );
+  }
+  if (!box) {
+    return (
+      <p className="text-sm text-gray-600">
+        Gmail: connecting… The worker sets this up within a minute.
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm text-gray-600">
+      Gmail: watching the inbox of {box.email}
+      {box.last_event_at ? ` · last email ${formatDateTime(box.last_event_at)}` : ''}
+      {box.watch_expiration ? ` · renews before ${formatDateTime(box.watch_expiration)}` : ''}
     </p>
   );
 }

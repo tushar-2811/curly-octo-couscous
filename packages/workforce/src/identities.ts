@@ -28,6 +28,12 @@ export const CHAT_SCOPES = [
   'https://www.googleapis.com/auth/pubsub',
 ] as const;
 
+/** Requested with Chat: read the employee's inbox and send email as it. */
+export const GMAIL_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+] as const;
+
 export const LINK_REQUEST_TTL_MS = 10 * 60 * 1000;
 
 export type LinkErrorCode =

@@ -84,8 +84,8 @@ export function TestMessage({
       </CardHeader>
       <CardContent>
         <p className="mb-4 text-sm text-gray-600">
-          Until Google Chat is connected, type a message as if someone sent it to {employeeName}. It
-          is classified and decided exactly like a real one, but nothing is sent.
+          Type a message as if someone sent it to {employeeName} in Chat. It is classified and
+          decided exactly like a real one, but nothing is sent.
         </p>
         {!modelReady && (
           <div className="mb-4">

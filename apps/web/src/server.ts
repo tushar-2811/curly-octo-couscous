@@ -2,7 +2,7 @@ import { createDb, pingDb } from '@aiw/db';
 import { createLogger, resolveLogFormat, startTelemetry, stopTelemetry } from '@aiw/logger';
 import { createModels } from '@aiw/engine';
 import { SecretBox } from '@aiw/platform';
-import { CHAT_SCOPES, IDENTITY_SCOPES } from '@aiw/workforce';
+import { CHAT_SCOPES, GMAIL_SCOPES, IDENTITY_SCOPES } from '@aiw/workforce';
 import { buildApp } from './app';
 import { loadWebConfig } from './config';
 import { HttpGoogleOAuth } from './google-oauth';
@@ -64,7 +64,10 @@ const app = await buildApp({
               `${config.DASHBOARD_URL}/api/v1/oauth/google/callback`,
             ),
             secrets: new SecretBox(config.TOKEN_ENCRYPTION_KEY),
-            scopes: chatConfigured ? [...IDENTITY_SCOPES, ...CHAT_SCOPES] : IDENTITY_SCOPES,
+            // Chat and Gmail share the Pub/Sub topic, so both are on when it is set.
+            scopes: chatConfigured
+              ? [...IDENTITY_SCOPES, ...CHAT_SCOPES, ...GMAIL_SCOPES]
+              : IDENTITY_SCOPES,
           },
         }
       : {}),
@@ -112,10 +115,13 @@ if (config.VOYAGE_API_KEY) {
 if (models.jira) logger.info({ site: models.jira.site }, 'jira reading enabled');
 else logger.warn('jira is off: set JIRA_BASE_URL, ATLASSIAN_EMAIL and ATLASSIAN_ACCESS_TOKEN');
 if (chatConfigured)
-  logger.info({ project: config.GOOGLE_CLOUD_PROJECT }, 'google chat access requested at sign-in');
+  logger.info(
+    { project: config.GOOGLE_CLOUD_PROJECT },
+    'google chat and gmail access requested at sign-in',
+  );
 else
   logger.warn(
-    'google chat is off: set GOOGLE_CLOUD_PROJECT, CHAT_EVENTS_TOPIC and CHAT_EVENTS_SUBSCRIPTION',
+    'google chat and gmail are off: set GOOGLE_CLOUD_PROJECT, CHAT_EVENTS_TOPIC and CHAT_EVENTS_SUBSCRIPTION',
   );
 if (config.AUTH_DEV_LOGIN) logger.warn('development sign-in is enabled (local only)');
 

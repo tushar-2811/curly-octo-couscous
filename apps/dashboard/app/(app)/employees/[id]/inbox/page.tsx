@@ -109,7 +109,7 @@ export default async function InboxPage({
             description={
               validCursor
                 ? undefined
-                : 'Messages from Google Chat will appear here once it is connected.'
+                : 'Messages from Google Chat and Gmail will appear here once they are connected.'
             }
           />
         ) : (

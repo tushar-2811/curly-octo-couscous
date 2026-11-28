@@ -238,6 +238,9 @@ export interface InboundMessagesTable {
   /** Chat thread to reply in (Chat's resource name). */
   reply_thread: ColumnType<string | null, string | null | undefined, string | null>;
   space_display_name: ColumnType<string | null, string | null | undefined, string | null>;
+  /** Email only: the Message-ID and References headers, for threading a reply. */
+  email_message_id: ColumnType<string | null, string | null | undefined, string | null>;
+  email_references: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 /** What the employee decided to do with a message, and why. */
@@ -357,6 +360,23 @@ export interface ChatSubscriptionsTable {
   updated_at: Timestamp;
 }
 
+/** An employee's Gmail watch and how far its mailbox history has been read. */
+export interface GmailMailboxesTable {
+  id: Generated<string>;
+  org_id: string;
+  employee_id: string;
+  email_address: string;
+  /** Gmail history id (int8; read as a string). */
+  history_id: ColumnType<string | null, string | null | undefined, string | null>;
+  watch_expiration: Timestamp | null;
+  watched_at: Timestamp | null;
+  last_event_at: Timestamp | null;
+  last_synced_at: Timestamp | null;
+  last_error: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
 export interface Database {
   'workforce.organizations': OrganizationsTable;
   'workforce.members': MembersTable;
@@ -370,6 +390,7 @@ export interface Database {
   'conversations.message_decisions': MessageDecisionsTable;
   'conversations.outbound_messages': OutboundMessagesTable;
   'conversations.chat_subscriptions': ChatSubscriptionsTable;
+  'conversations.gmail_mailboxes': GmailMailboxesTable;
   'knowledge.memory_items': MemoryItemsTable;
   'knowledge.space_members': SpaceMembersTable;
   'knowledge.memory_sources': MemorySourcesTable;
@@ -394,3 +415,4 @@ export type MessageDecision = Selectable<MessageDecisionsTable>;
 export type MemoryItem = Selectable<MemoryItemsTable>;
 export type OutboundMessage = Selectable<OutboundMessagesTable>;
 export type ChatSubscription = Selectable<ChatSubscriptionsTable>;
+export type GmailMailbox = Selectable<GmailMailboxesTable>;

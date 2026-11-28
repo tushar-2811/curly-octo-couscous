@@ -62,6 +62,7 @@ export {
   disconnectIdentity,
   GOOGLE_PROVIDER,
   CHAT_SCOPES,
+  GMAIL_SCOPES,
   IDENTITY_SCOPES,
   IdentityLinkError,
   LINK_ERROR_MESSAGES,

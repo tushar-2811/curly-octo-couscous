@@ -107,7 +107,26 @@ export {
   ingestChatMessage,
   MESSAGE_CREATED,
   noteSubscriptionError,
-  sendQueuedReplies,
-  sendReply,
+  postChatReply,
   type ChatDeps,
 } from './google/chat';
+export { sendQueuedReplies, sendReply } from './google/delivery';
+export {
+  ensureGmailWatch,
+  gmailEmployees,
+  gmailNotification,
+  handleGmailEvent,
+  ingestEmail,
+  noteMailboxError,
+  sendEmailReply,
+  syncMailbox,
+  type GmailDeps,
+} from './google/gmail';
+export {
+  automatedReason,
+  buildReplyMime,
+  extractBody,
+  parseAddressList,
+  stripQuoted,
+  OUTBOUND_HEADER,
+} from './google/email';
