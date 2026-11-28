@@ -98,7 +98,7 @@ intent:
 - unclear: cannot tell what is wanted.
 
 addressed_to_me:
-- explicit_mention / direct_message: only when the facts say so.
+- explicit_mention / direct_message: only when the facts say so (an email with the employee in To counts as direct_message).
 - implicit: not mentioned, but clearly meant for the employee (its name is used, it is a reply in its thread, or it continues a conversation with it).
 - not_addressed: meant for someone else or for the group in general.
 

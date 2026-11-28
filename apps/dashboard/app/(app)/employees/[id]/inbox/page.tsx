@@ -194,7 +194,11 @@ function Entry({ entry, employeeName }: { entry: InboxEntry; employeeName: strin
         )}
         {c && <Badge>{INTENT_LABELS[c.intent] ?? c.intent}</Badge>}
         {c && (
-          <Badge variant="muted">{ADDRESSED_LABELS[c.addressed_to_me] ?? c.addressed_to_me}</Badge>
+          <Badge variant="muted">
+            {m.space_type === 'email' && c.addressed_to_me === 'direct_message'
+              ? 'Sent to it'
+              : (ADDRESSED_LABELS[c.addressed_to_me] ?? c.addressed_to_me)}
+          </Badge>
         )}
         {d?.needs.map((n) => (
           <Badge key={n} variant="muted">

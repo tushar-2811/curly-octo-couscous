@@ -370,6 +370,8 @@ export interface GmailMailboxesTable {
   history_id: ColumnType<string | null, string | null | undefined, string | null>;
   watch_expiration: Timestamp | null;
   watched_at: Timestamp | null;
+  /** Read inbox mail received after this on the next sync (set when a watch starts). */
+  backfill_after: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
   last_event_at: Timestamp | null;
   last_synced_at: Timestamp | null;
   last_error: string | null;

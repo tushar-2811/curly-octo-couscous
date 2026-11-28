@@ -226,7 +226,10 @@ describe.skipIf(!url)('gmail', () => {
       labelIds: ['INBOX'],
       labelFilterBehavior: 'INCLUDE',
     });
-    expect(await mailbox()).toMatchObject({ history_id: '100', last_error: null });
+    const box = await mailbox();
+    expect(box).toMatchObject({ history_id: '100', last_error: null });
+    // A new account: mail since it was linked is read on the next sync.
+    expect(box.backfill_after).not.toBeNull();
     // Fresh watch: nothing to do until it nears expiry.
     expect((await ensureGmailWatch(deps, { orgId: ctx.orgId, employeeId: nova.id })).action).toBe(
       'kept',
@@ -286,6 +289,24 @@ describe.skipIf(!url)('gmail', () => {
     const box = await mailbox();
     expect(box.history_id).toBe('105');
     expect(box.last_event_at).not.toBeNull();
+    const search = fake.calls.find((c) => c.url.includes('/messages?q='))!;
+    expect(decodeURIComponent(search.url)).toMatch(/q=in:inbox\+after:\d+/);
+    expect(box.backfill_after).toBeNull();
+  });
+
+  it('starts a new watch when the account is linked again', async () => {
+    await withTenant(db, ctx.orgId, (trx) =>
+      trx
+        .updateTable('workforce.external_identities')
+        .set({ connected_at: new Date(Date.now() + 1000) })
+        .where('member_id', '=', nova.id)
+        .execute(),
+    );
+    expect((await ensureGmailWatch(deps, { orgId: ctx.orgId, employeeId: nova.id })).action).toBe(
+      'renewed',
+    );
+    // Same account: keeps reading from where it stopped.
+    expect((await mailbox()).history_id).toBe('105');
   });
 
   it('catches up from recent mail when the stored history is too old', async () => {

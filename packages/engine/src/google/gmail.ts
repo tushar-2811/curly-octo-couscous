@@ -85,9 +85,13 @@ export async function ensureGmailWatch(
   deps: GmailDeps,
   auth: Auth,
 ): Promise<{ action: 'kept' | 'renewed' | 'created' | 'restarted'; email: string }> {
-  const stored = await loadMailbox(deps, auth);
+  const [stored, linked] = await Promise.all([loadMailbox(deps, auth), linkedAt(deps, auth)]);
   const expires = stored?.watch_expiration ? new Date(stored.watch_expiration).getTime() : 0;
-  if (stored && expires - Date.now() > RENEW_WHEN_LEFT_MS) {
+  // Linking again revokes the old token, which can end the old watch: start a new one.
+  const relinked = Boolean(
+    stored?.watched_at && linked && new Date(stored.watched_at).getTime() < linked.getTime(),
+  );
+  if (stored && !relinked && expires - Date.now() > RENEW_WHEN_LEFT_MS) {
     return { action: 'kept', email: stored.email_address };
   }
   const [profile, watch] = await Promise.all([
@@ -99,6 +103,8 @@ export async function ensureGmailWatch(
   const sameAccount = stored?.email_address.toLowerCase() === email;
   const action = !stored ? 'created' : sameAccount ? 'renewed' : 'restarted';
   const now = new Date();
+  // A new account: also read mail that arrived after it was linked but before this watch.
+  const backfillAfter = action === 'renewed' ? null : new Date((linked ?? now).getTime() - 60_000);
   await withTenant(deps.db, auth.orgId, (trx) =>
     trx
       .insertInto('conversations.gmail_mailboxes')
@@ -109,6 +115,7 @@ export async function ensureGmailWatch(
         history_id: watch.historyId,
         watch_expiration: expiration,
         watched_at: now,
+        backfill_after: backfillAfter,
         last_error: null,
         created_at: now,
         updated_at: now,
@@ -122,6 +129,7 @@ export async function ensureGmailWatch(
             : watch.historyId,
           watch_expiration: expiration,
           watched_at: now,
+          ...(backfillAfter ? { backfill_after: backfillAfter } : {}),
           last_error: null,
           updated_at: now,
         }),
@@ -133,6 +141,21 @@ export async function ensureGmailWatch(
     'gmail watch updated',
   );
   return { action, email };
+}
+
+/** When the employee's current Google account was linked. */
+async function linkedAt(deps: GmailDeps, auth: Auth): Promise<Date | null> {
+  const identity = await withTenant(deps.db, auth.orgId, (trx) =>
+    trx
+      .selectFrom('workforce.external_identities')
+      .select('connected_at')
+      .where('member_id', '=', auth.employeeId)
+      .where('provider', '=', 'google_workspace')
+      .where('connection_status', '=', 'connected')
+      .orderBy('connected_at', 'desc')
+      .executeTakeFirst(),
+  );
+  return identity?.connected_at ? new Date(identity.connected_at) : null;
 }
 
 /** Record a failed watch or sync on the mailbox, for the dashboard. */
@@ -287,7 +310,7 @@ async function runSync(
     if (!(err instanceof GoogleApiError && err.code === 'not_found')) throw err;
     // Gmail keeps about a week of history. Read recent inbox mail instead, then go on.
     const [recent, profile] = await Promise.all([
-      deps.google.gmailRecentInbox(auth, CATCH_UP_MAX),
+      deps.google.gmailSearchInbox(auth, 'newer_than:2d', CATCH_UP_MAX),
       deps.google.gmailProfile(auth),
     ]);
     log.warn(
@@ -296,6 +319,18 @@ async function runSync(
     );
     ids.push(...recent.map((m) => m.id).reverse());
     latest = profile.historyId;
+  }
+  if (mailbox.backfill_after) {
+    const since = Math.floor(new Date(mailbox.backfill_after).getTime() / 1000);
+    const missed = await deps.google.gmailSearchInbox(auth, `after:${since}`, CATCH_UP_MAX);
+    const fresh = missed.map((m) => m.id).filter((id) => !ids.includes(id));
+    if (fresh.length > 0) {
+      log.info(
+        { since: new Date(since * 1000).toISOString(), emails: fresh.length },
+        'reading email from since the account was linked',
+      );
+    }
+    ids.unshift(...fresh.reverse());
   }
   const stored: string[] = [];
   for (const id of ids) {
@@ -307,6 +342,7 @@ async function runSync(
       .updateTable('conversations.gmail_mailboxes')
       .set({
         history_id: sql<string>`greatest(history_id, ${latest}::bigint)`,
+        backfill_after: null,
         last_synced_at: new Date(),
         last_error: null,
         updated_at: new Date(),

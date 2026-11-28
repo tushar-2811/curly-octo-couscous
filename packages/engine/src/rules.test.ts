@@ -102,6 +102,16 @@ describe('reconciling the classifier with the facts', () => {
     const invented = reconcile(cls({ addressed_to_me: 'explicit_mention' }), facts());
     expect(invented.classification.addressed_to_me).toBe('implicit');
     expect(reconcile(cls(), facts({ explicitly_mentioned: true })).corrections).toEqual([]);
+    // Email: in To is direct; only in Cc is not.
+    const emailed = reconcile(
+      cls({ addressed_to_me: 'direct_message' }),
+      facts({ recipient_role: 'to' }),
+    );
+    expect(emailed.corrections).toEqual([]);
+    expect(
+      reconcile(cls({ addressed_to_me: 'direct_message' }), facts({ recipient_role: 'cc' }))
+        .classification.addressed_to_me,
+    ).toBe('implicit');
   });
 });
 

@@ -313,9 +313,16 @@ export class GoogleWorkspace {
     return this.call(auth, 'Gmail', 'GET', `${GMAIL}/history?${params.toString()}`);
   }
 
-  /** Recent inbox message ids, for catching up when the history id is too old. */
-  async gmailRecentInbox(auth: Auth, max: number): Promise<{ id: string; threadId: string }[]> {
-    const params = new URLSearchParams({ q: 'in:inbox newer_than:2d', maxResults: String(max) });
+  /**
+   * Inbox message ids matching a Gmail search, newest first: recent mail when the history
+   * id is too old, or mail since the account was linked.
+   */
+  async gmailSearchInbox(
+    auth: Auth,
+    query: string,
+    max: number,
+  ): Promise<{ id: string; threadId: string }[]> {
+    const params = new URLSearchParams({ q: `in:inbox ${query}`, maxResults: String(max) });
     const out = await this.call<{ messages?: { id: string; threadId: string }[] }>(
       auth,
       'Gmail',

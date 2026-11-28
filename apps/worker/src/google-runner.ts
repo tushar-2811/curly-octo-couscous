@@ -19,6 +19,8 @@ import type { Logger } from '@aiw/logger';
 import { type Client, WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 
 const KEEP_ALIVE_MS = 10 * 60_000;
+/** How often to look for newly linked employees, so they start listening quickly. */
+const NEW_LINK_MS = 60_000;
 const MAX_PULL = 20;
 
 type Auth = { orgId: string; employeeId: string };
@@ -39,6 +41,9 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
 export class GoogleRunner {
   private stopped = false;
   private keepTimer: NodeJS.Timeout | undefined;
+  private newTimer: NodeJS.Timeout | undefined;
+  /** Employees set up by this process; anyone else is new and is set up within a minute. */
+  private readonly ready = { chat: new Set<string>(), gmail: new Set<string>() };
   private loop: Promise<void> | undefined;
 
   constructor(
@@ -54,6 +59,7 @@ export class GoogleRunner {
   start(): void {
     void this.keepAlive();
     this.keepTimer = setInterval(() => void this.keepAlive(), KEEP_ALIVE_MS);
+    this.newTimer = setInterval(() => void this.keepAlive(true), NEW_LINK_MS);
     this.loop = this.pullLoop();
     this.deps.logger.info(
       { subscription: this.deps.subscription },
@@ -64,15 +70,30 @@ export class GoogleRunner {
   async stop(): Promise<void> {
     this.stopped = true;
     clearInterval(this.keepTimer);
+    clearInterval(this.newTimer);
     await this.loop;
   }
 
-  async keepAlive(): Promise<void> {
-    await Promise.all([this.keepChat(), this.keepGmail()]);
+  /** Set up or renew everyone, or with `onlyNew` only employees linked since the last run. */
+  async keepAlive(onlyNew = false): Promise<void> {
+    if (this.keeping) return;
+    this.keeping = true;
+    try {
+      await Promise.all([this.keepChat(onlyNew), this.keepGmail(onlyNew)]);
+    } finally {
+      this.keeping = false;
+    }
+  }
+
+  private keeping = false;
+
+  private forget(ready: Set<string>, employees: Auth[]): void {
+    const current = new Set(employees.map((e) => e.employeeId));
+    for (const id of ready) if (!current.has(id)) ready.delete(id);
   }
 
   /** Create, renew or reactivate each Chat employee's subscription. */
-  private async keepChat(): Promise<void> {
+  private async keepChat(onlyNew: boolean): Promise<void> {
     let employees: Auth[];
     try {
       employees = await chatEmployees(this.deps.db);
@@ -80,9 +101,13 @@ export class GoogleRunner {
       this.deps.logger.error({ err }, 'could not list chat employees');
       return;
     }
+    // Disconnected (or stopped) employees are forgotten, so linking again counts as new.
+    this.forget(this.ready.chat, employees);
     for (const auth of employees) {
+      if (onlyNew && this.ready.chat.has(auth.employeeId)) continue;
       try {
         await ensureChatSubscription(this.deps, auth);
+        this.ready.chat.add(auth.employeeId);
       } catch (err) {
         this.deps.logger.error(
           { err, employee_id: auth.employeeId, code: codeOf(err) },
@@ -94,7 +119,7 @@ export class GoogleRunner {
   }
 
   /** Start or renew each Gmail watch, then sync the inbox in case a notification was lost. */
-  private async keepGmail(): Promise<void> {
+  private async keepGmail(onlyNew: boolean): Promise<void> {
     let employees: Auth[];
     try {
       employees = await gmailEmployees(this.deps.db);
@@ -102,11 +127,15 @@ export class GoogleRunner {
       this.deps.logger.error({ err }, 'could not list gmail employees');
       return;
     }
+    // Disconnected (or stopped) employees are forgotten, so linking again counts as new.
+    this.forget(this.ready.gmail, employees);
     for (const auth of employees) {
+      if (onlyNew && this.ready.gmail.has(auth.employeeId)) continue;
       try {
         await ensureGmailWatch(this.deps, auth);
         const { messageIds } = await syncMailbox(this.deps, auth);
         for (const id of messageIds) await this.startWorkflow(auth.orgId, id);
+        this.ready.gmail.add(auth.employeeId);
       } catch (err) {
         this.deps.logger.error(
           { err, employee_id: auth.employeeId, code: codeOf(err) },

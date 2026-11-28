@@ -62,7 +62,8 @@ export function reconcile(
   let addressed = c.addressed_to_me;
   const factual = facts.explicitly_mentioned
     ? 'explicit_mention'
-    : facts.direct_message
+    : // An email with the employee in To is a direct message too.
+      facts.direct_message || facts.recipient_role === 'to'
       ? 'direct_message'
       : null;
   if (factual && addressed !== factual) {
