@@ -300,8 +300,10 @@ const ANSWERED: Record<'yes' | 'partly' | 'no', string> = {
 
 function sourceSummary(sources: InboxReply['sources']): string {
   const tickets = sources.filter((s) => s.source === 'jira').length;
-  const memories = sources.length - tickets;
+  const org = sources.filter((s) => s.source === 'org_chart').length;
+  const memories = sources.length - tickets - org;
   return [
+    org > 0 ? `${org} org chart ${org === 1 ? 'entry' : 'entries'}` : '',
     tickets > 0 ? `${tickets} Jira ${tickets === 1 ? 'ticket' : 'tickets'}` : '',
     memories > 0 ? `${memories} ${memories === 1 ? 'memory' : 'memories'}` : '',
   ]
@@ -324,7 +326,15 @@ function Reply({ reply: r, name }: { reply: InboxReply; name: string }) {
           Error: {r.error_code ? (ERROR_LABELS[r.error_code] ?? r.error_code) : r.body}
         </p>
       ) : (
-        <p className="mt-0.5 whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{r.body}</p>
+        <>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">{r.body}</p>
+          {r.error_code && (
+            <p role="alert" className="mt-0.5 text-xs font-semibold text-red-600">
+              Warning: no answer could be drafted ({ERROR_LABELS[r.error_code] ?? r.error_code}), so
+              this short reply was sent instead.
+            </p>
+          )}
+        </>
       )}
       {r.sources.length > 0 && (
         <details className="mt-1">

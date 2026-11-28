@@ -184,6 +184,34 @@ describe.skipIf(!url)('processing messages', () => {
     expect(prompt).toContain('an email with the subject "WEB-12 status"');
   });
 
+  it('answers questions about people from the org chart', async () => {
+    const { message } = await receive({
+      spaceType: 'direct',
+      spaceName: null,
+      body: 'Nova, who is your manager?',
+    });
+    llm.next.push(
+      answer({
+        needs: ['people_directory'],
+        references: { jira_keys: [], repos: [], people: [], urls: [] },
+      }),
+    );
+    llm.replies.push({
+      reply: 'No manager is set for me yet.',
+      answered: 'yes',
+      used_sources: [1],
+    });
+    const before = llm.requests.length;
+    const result = await processMessage({ db, llm, logger: silent }, ctx.orgId, message.id);
+    const prompt = llm.requests[before + 1]!.input;
+    expect(prompt).toContain('(org chart person) You: Nova');
+    expect(prompt).not.toContain('cannot look these up');
+    expect(result.replies.map((r) => r.kind)).toEqual(['reply']);
+    expect(JSON.parse(JSON.stringify(result.replies[0]!.sources))).toEqual([
+      expect.objectContaining({ source: 'org_chart', label: 'Nova' }),
+    ]);
+  });
+
   it('answers from memory the asker could see, citing only real sources', async () => {
     const earlier = await receive({ body: 'Heads up: the checkout redesign ships on 4 December' });
     llm.next.push(
@@ -331,11 +359,12 @@ describe.skipIf(!url)('processing messages', () => {
     expect(audit).toHaveLength(1);
   });
 
-  it('leaves the message to retry when the model is down, and needs review when output is bad', async () => {
+  it('leaves the message to retry when the model is down, and asks to clarify when output is bad', async () => {
     const down = await receive({ spaceType: 'direct' });
     llm.next.push(new LlmError('unavailable', 'down'));
     const failed = await processMessage({ db, llm, logger: silent }, ctx.orgId, down.message.id);
-    expect(failed.decision).toMatchObject({ action: 'needs_review', error_code: 'unavailable' });
+    expect(failed.decision).toMatchObject({ error_code: 'unavailable' });
+    expect(failed.replies).toEqual([]);
     expect(failed.message.status).toBe('failed');
 
     llm.next.push(answer({ addressed_to_me: 'direct_message' }));
@@ -346,24 +375,37 @@ describe.skipIf(!url)('processing messages', () => {
     const bad = await receive({ spaceType: 'direct' });
     llm.next.push({ intent: 'gossip' });
     const invalid = await processMessage({ db, llm, logger: silent }, ctx.orgId, bad.message.id);
-    expect(invalid.decision).toMatchObject({
-      action: 'needs_review',
-      error_code: 'invalid_output',
-    });
+    expect(invalid.decision).toMatchObject({ action: 'reply', error_code: 'invalid_output' });
     expect(invalid.message.status).toBe('decided');
+    // It asks the sender itself; nothing waits for a person.
+    expect(llm.requests.at(-1)!.input).toContain('Task: clarify');
+    expect(invalid.replies.map((r) => r.kind)).toEqual(['reply']);
+
+    // Drafting fails too: an honest short reply goes out instead of silence.
+    const again = await receive({ spaceType: 'direct' });
+    llm.next.push(answer({ addressed_to_me: 'direct_message', needs: [] }));
+    llm.replies.push(new LlmError('timeout', 'slow'));
+    const fallback = await processMessage({ db, llm, logger: silent }, ctx.orgId, again.message.id);
+    expect(fallback.replies[0]).toMatchObject({
+      status: 'draft',
+      answered: 'no',
+      error_code: 'timeout',
+      body: "Sorry, I couldn't look into this just now. Please ask me again in a few minutes.",
+    });
   });
 
   it('works without a model configured', async () => {
     const { message } = await receive({ spaceType: 'direct' });
     const result = await processMessage({ db, llm: null, logger: silent }, ctx.orgId, message.id);
-    expect(result.decision).toMatchObject({ action: 'needs_review', error_code: 'not_configured' });
+    expect(result.decision).toMatchObject({ action: 'remember', error_code: 'not_configured' });
+    expect(result.replies).toEqual([]);
   });
 
   it('lists the inbox newest first with decisions', async () => {
     const page = await inOrg((trx) => listInbox(trx, nova.id, { limit: 3 }));
     expect(page.entries).toHaveLength(3);
     expect(page.nextCursor).toBe(page.entries[2]!.message.id);
-    expect(page.entries[0]!.decision?.action).toBe('needs_review');
+    expect(page.entries[0]!.decision?.action).toBe('remember');
     const next = await inOrg((trx) =>
       listInbox(trx, nova.id, { limit: 50, before: page.nextCursor! }),
     );

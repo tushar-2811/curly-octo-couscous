@@ -152,8 +152,10 @@ describe('decision rules', () => {
     expect(decide(mention, cls({ intent: 'unclear' })).reasons[0]).toMatch(/clarify/);
   });
 
-  it('asks a person to check when it could not classify a message meant for it', () => {
-    expect(decide(facts({ direct_message: true }), null).action).toBe('needs_review');
+  it('asks the sender to clarify, never a person, when it could not classify a message', () => {
+    const unsure = decide(facts({ direct_message: true }), null);
+    expect(unsure.action).toBe('reply');
+    expect(unsure.reasons[0]).toMatch(/clarify/);
     expect(decide(facts(), null).action).toBe('remember');
   });
 });

@@ -56,7 +56,7 @@ export interface InboxReply {
   answered: 'yes' | 'partly' | 'no' | null;
   /** Older drafts only have memory_id. */
   sources: {
-    source?: 'memory' | 'jira';
+    source?: 'memory' | 'jira' | 'org_chart';
     id?: string;
     memory_id?: string;
     label?: string;

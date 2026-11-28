@@ -10,11 +10,19 @@ import {
 import type { Logger } from '@aiw/logger';
 import { recordChange } from '@aiw/platform';
 import { PROMPT_VERSION, type Classification } from './classification';
-import { ACK_TEXT, ANSWER_PROMPT_VERSION, draftReply, replyTask, type Evidence } from './answer';
+import {
+  ACK_TEXT,
+  ANSWER_PROMPT_VERSION,
+  draftReply,
+  fallbackReply,
+  replyTask,
+  type Evidence,
+} from './answer';
 import { classifyMessage } from './classifier';
 import type { Embedder } from './embeddings';
 import { loadConversation } from './context';
 import { jiraEvidence } from './jira-evidence';
+import { orgChartEvidence } from './org-chart';
 import type { JiraReader } from './jira';
 import { embedQuery, readersFor, rememberMessage, searchMemory } from './memory';
 import { decide, DEFAULT_POLICY, type Decision, type DecisionPolicy } from './decide';
@@ -204,7 +212,16 @@ export async function processMessage(
     }
   }
 
-  const decision: Decision = decide(facts, classification, deps.policy ?? DEFAULT_POLICY);
+  let decision: Decision = decide(facts, classification, deps.policy ?? DEFAULT_POLICY);
+  if (!deps.llm && (decision.action === 'reply' || decision.action === 'acknowledge')) {
+    // Without a model nothing can be written; keep it rather than claim a reply.
+    decision = {
+      ...decision,
+      action: 'remember',
+      reasons: ['No model is configured, so it cannot reply; kept for memory', ...decision.reasons],
+      ackFirst: false,
+    };
+  }
 
   const saved = await withTenant(deps.db, orgId, async (trx) => {
     const row = await trx
@@ -301,7 +318,8 @@ export async function processMessage(
       }
     }
     const readers = readersFor(saved.updated);
-    const [memoryHits, jira] = await Promise.all([
+    const wantsOrgChart = decision.needs.includes('people_directory');
+    const [memoryHits, jira, orgChart] = await Promise.all([
       withTenant(deps.db, orgId, (trx) =>
         searchMemory(trx, {
           employeeId: employee.id,
@@ -320,9 +338,32 @@ export async function processMessage(
         context: [...thread].reverse().map((t) => t.text),
         logger: log,
       }),
+      wantsOrgChart
+        ? withTenant(deps.db, orgId, (trx) =>
+            orgChartEvidence(trx, {
+              employeeId: employee.id,
+              senderMemberId: message.sender_member_id,
+              people: classification?.references.people ?? [],
+              text: queryText,
+            }),
+          ).catch((err: unknown) => {
+            log.error({ err }, 'org chart lookup failed; answering without it');
+            return { items: [], notes: ['The org chart could not be read just now.'] };
+          })
+        : Promise.resolve({ items: [], notes: [] }),
     ]);
-    // Tickets first: they are the current state; memory is what people said.
+    if (wantsOrgChart) {
+      log.info(
+        {
+          people: orgChart.items.filter((i) => i.kind === 'person').length,
+          teams: orgChart.items.filter((i) => i.kind === 'team').length,
+        },
+        'org chart looked up',
+      );
+    }
+    // The org chart and tickets first: they are the current state; memory is what people said.
     const evidence: Evidence[] = [
+      ...orgChart.items,
       ...jira.items,
       ...memoryHits.map((h) => ({
         id: h.id,
@@ -350,9 +391,9 @@ export async function processMessage(
         task,
         evidence,
         unavailable: decision.needs.filter(
-          (n) => n !== 'memory' && !(n === 'jira' && jira.available),
+          (n) => n !== 'memory' && n !== 'people_directory' && !(n === 'jira' && jira.available),
         ),
-        notes: jira.notes,
+        notes: [...jira.notes, ...orgChart.notes],
       });
       row = {
         ...base,
@@ -393,13 +434,15 @@ export async function processMessage(
       );
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
-      log.error({ err, code: err.code }, 'could not draft a reply');
+      // Say so rather than stay silent; the error code stays on the reply for the logs.
+      log.error({ err, code: err.code }, 'could not draft a reply; sending a short fallback');
+      const fallback = fallbackReply(err.code);
       row = {
         ...base,
         kind: 'reply',
-        body: 'No reply could be drafted.',
-        status: 'failed',
-        answered: null,
+        body: message.source === 'gmail' ? `${fallback}\n\n${employee.display_name}` : fallback,
+        status: outStatus,
+        answered: 'no',
         sources: '[]',
         model: deps.llm.model,
         latency_ms: null,

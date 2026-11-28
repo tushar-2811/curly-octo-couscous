@@ -45,9 +45,10 @@ export function decide(
       : decision('ignore', 'From outside the organization and not addressed to the employee');
   }
 
+  // Never hand a message to a person: when it can't tell what is wanted, it asks.
   if (!c) {
     return direct || facts.name_in_text
-      ? decision('needs_review', 'The message could not be classified; a person should check it')
+      ? decision('reply', 'Could not tell what is wanted; asking the sender to clarify')
       : decision('remember', 'The message could not be classified; kept for memory only');
   }
 
